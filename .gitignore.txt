@@ -1,0 +1,11 @@
+# Binaries
+target/
+node_modules/
+.env
+
+# Docker volumes
+postgres-data/
+redis-data/
+
+# Logs
+*.log
