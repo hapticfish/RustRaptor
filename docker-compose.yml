@@ -1,0 +1,35 @@
+
+
+services:
+  rust-backend:
+    build: ./rust-backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+
+  discord-bot:
+    build: ./discord-bot
+    depends_on:
+      - rust-backend
+
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: zardamin
+      POSTGRES_PASSWORD: supersecret
+      POSTGRES_DB: Rust_Raptor_Database
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    restart: always
+    volumes:
+      - ./redis-data:/data
+    ports:
+      - "6379:6379"
