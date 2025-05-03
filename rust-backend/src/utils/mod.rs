@@ -1,3 +1,4 @@
 mod signature;
 mod time;
-mod errors;
+pub(crate) mod errors;
+pub(crate) mod types;

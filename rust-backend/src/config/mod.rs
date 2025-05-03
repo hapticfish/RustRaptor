@@ -1,1 +1,1 @@
-mod settings;
+pub(crate) mod settings;
