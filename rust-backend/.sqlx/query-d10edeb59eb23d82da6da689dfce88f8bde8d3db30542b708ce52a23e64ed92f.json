@@ -1,0 +1,152 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT order_id,\n               external_order_id,\n               user_id,\n               exchange,\n               market_type  AS \"market_type!: MarketType\",\n               symbol,\n               side,\n               order_type   AS \"order_type!: OrderType\",\n               price        AS \"price:      sqlx::types::BigDecimal\",\n               size         AS \"size:       sqlx::types::BigDecimal\",\n               reduce_only,\n               margin_mode,\n               position_side,\n               status       AS \"status!:    OrderStatus\",\n               opened_at,\n               closed_at\n        FROM   orders\n        WHERE  user_id = $1\n        ORDER  BY opened_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "order_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "external_order_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "exchange",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "market_type!: MarketType",
+        "type_info": {
+          "Custom": {
+            "name": "market_type_enum",
+            "kind": {
+              "Enum": [
+                "spot",
+                "futures",
+                "swap",
+                "options"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "symbol",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "side",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "order_type!: OrderType",
+        "type_info": {
+          "Custom": {
+            "name": "order_type_enum",
+            "kind": {
+              "Enum": [
+                "market",
+                "limit",
+                "post_only",
+                "fok",
+                "ioc",
+                "trigger",
+                "conditional"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "price:      sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "size:       sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "reduce_only",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 11,
+        "name": "margin_mode",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "position_side",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 13,
+        "name": "status!:    OrderStatus",
+        "type_info": {
+          "Custom": {
+            "name": "order_status",
+            "kind": {
+              "Enum": [
+                "live",
+                "partially_filled",
+                "filled",
+                "cancelled",
+                "rejected"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "opened_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "closed_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "d10edeb59eb23d82da6da689dfce88f8bde8d3db30542b708ce52a23e64ed92f"
+}

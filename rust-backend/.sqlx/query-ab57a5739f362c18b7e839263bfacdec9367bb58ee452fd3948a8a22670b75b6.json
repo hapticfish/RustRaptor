@@ -1,0 +1,100 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT snapshot_id,\n               user_id,\n               exchange,\n               symbol,\n               market_type       AS \"market_type!: MarketType\",\n               side,\n               size              AS \"size:              sqlx::types::BigDecimal\",\n               avg_entry_price   AS \"avg_entry_price:   sqlx::types::BigDecimal\",\n               unrealised_pnl    AS \"unrealised_pnl:    sqlx::types::BigDecimal\",\n               leverage          AS \"leverage:          sqlx::types::BigDecimal\",\n               liquidation_price AS \"liquidation_price: sqlx::types::BigDecimal\",\n               captured_at\n        FROM   positions\n        WHERE  user_id = $1\n        ORDER  BY captured_at DESC\n        LIMIT  20\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "snapshot_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "exchange",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "symbol",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "market_type!: MarketType",
+        "type_info": {
+          "Custom": {
+            "name": "market_type_enum",
+            "kind": {
+              "Enum": [
+                "spot",
+                "futures",
+                "swap",
+                "options"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "side",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "size:              sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "avg_entry_price:   sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "unrealised_pnl:    sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "leverage:          sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "liquidation_price: sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 11,
+        "name": "captured_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "ab57a5739f362c18b7e839263bfacdec9367bb58ee452fd3948a8a22670b75b6"
+}

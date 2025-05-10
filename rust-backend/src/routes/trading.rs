@@ -1,13 +1,15 @@
 // src/routes/trading.rs
 
-use actix_web::{post, get, web, HttpResponse, Responder};
+use actix_web::{post, get, web, HttpResponse, Responder, Scope};
 use serde::Deserialize;
-
+use actix_web::dev::{HttpServiceFactory, ServiceFactory, ServiceRequest, ServiceResponse};
+use actix_web::Error;
 use crate::config::settings::Settings;
 use crate::services::trading_engine::{execute_trade, Exchange, TradeRequest, TradeResponse};
 use crate::services::blowfin::api::get_balance;
 use crate::utils::types::ApiResponse;
 use serde_json::Value;
+use crate::middleware::path_logger::PathLogger;
 
 #[derive(Debug, Deserialize)]
 pub struct TradeParams {
@@ -19,7 +21,7 @@ pub struct TradeParams {
     pub size: f64,
 }
 
-#[post("/api/trade")]
+#[post("/trade")]
 pub async fn trade(
     params: web::Json<TradeParams>,
     settings: web::Data<Settings>,
@@ -58,7 +60,7 @@ pub async fn trade(
     }
 }
 
-#[get("/api/balance")]
+#[get("/balance")]
 pub async fn balance(
     settings: web::Data<Settings>,
 ) -> impl Responder {
@@ -74,4 +76,38 @@ pub async fn balance(
             data: None,
         }),
     }
+}
+
+#[get("/test")]
+pub async fn test_trade_api() -> impl Responder {
+    HttpResponse::Ok().body("Trading scope is active.")
+}
+
+#[get("/routes")]
+pub async fn list_routes() -> impl Responder {
+    let routes = vec![
+        "/health",
+        "/api/trade",
+        "/api/balance",
+        "/api/test",
+    ];
+
+    HttpResponse::Ok().json(routes)
+}
+
+#[get("/simple")]
+pub async fn simple_test() -> impl Responder {
+
+    HttpResponse::Ok().body("Simple test route")
+}
+
+pub fn trading_scope() -> impl HttpServiceFactory {
+
+    web::scope("/api")
+        .wrap(PathLogger)
+        .service(simple_test)
+        .service(test_trade_api)
+        .service(balance)
+        .service(trade)
+        .service(list_routes)
 }

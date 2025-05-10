@@ -3,6 +3,10 @@
 services:
   rust-backend:
     build: ./rust-backend
+    environment:
+      - RUST_LOG=info,actix_web=debug
+      - DATABASE_URL=postgres://zardamin:LizardLake4%21@postgres:5432/rustraptor_database
+      - REDIS_URL=redis://redis:6379
     ports:
       - "8080:8080"
     depends_on:
@@ -21,8 +25,8 @@ services:
     restart: always
     environment:
       POSTGRES_USER: zardamin
-      POSTGRES_PASSWORD: supersecret
-      POSTGRES_DB: Rust_Raptor_Database
+      POSTGRES_PASSWORD: LizardLake4!
+      POSTGRES_DB: rustraptor_database
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
     ports:

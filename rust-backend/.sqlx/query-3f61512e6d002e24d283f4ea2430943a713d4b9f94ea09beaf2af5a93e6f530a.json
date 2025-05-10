@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT relation_id,\n               leader_user_id,\n               follower_user_id,\n               since,\n               until,\n               status\n        FROM   copy_relations\n        WHERE  leader_user_id = $1\n        AND    status = 'active'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "relation_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "leader_user_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "follower_user_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "since",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "until",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "status",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "3f61512e6d002e24d283f4ea2430943a713d4b9f94ea09beaf2af5a93e6f530a"
+}

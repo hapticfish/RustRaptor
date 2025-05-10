@@ -1,0 +1,80 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT fill_id,\n               order_id,\n               maker_taker   AS \"maker_taker!: MakerTaker\",\n               fill_price    AS \"fill_price:    sqlx::types::BigDecimal\",\n               fill_size     AS \"fill_size:     sqlx::types::BigDecimal\",\n               trade_fee     AS \"trade_fee:     sqlx::types::BigDecimal\",\n               funding_fee   AS \"funding_fee:   sqlx::types::BigDecimal\",\n               realised_pnl  AS \"realised_pnl:  sqlx::types::BigDecimal\",\n               executed_at\n        FROM   fills\n        WHERE  order_id = $1\n        ORDER  BY executed_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fill_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "order_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "maker_taker!: MakerTaker",
+        "type_info": {
+          "Custom": {
+            "name": "maker_taker_enum",
+            "kind": {
+              "Enum": [
+                "maker",
+                "taker"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "fill_price:    sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "fill_size:     sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "trade_fee:     sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "funding_fee:   sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "realised_pnl:  sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "executed_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "89814228886939a2a0eb04b5f5def93c7deaeca091ff86050974e16a48aa814e"
+}

@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT key_id, user_id, exchange,\n               encrypted_api_key, encrypted_secret, encrypted_passphrase,\n               created_at\n        FROM   api_keys\n        WHERE  user_id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "key_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "exchange",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "encrypted_api_key",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 4,
+        "name": "encrypted_secret",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 5,
+        "name": "encrypted_passphrase",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "7424588157c09b37624d7545cdb7cb66ce33d61a611ca06b8003c1d49ffbe4be"
+}

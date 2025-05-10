@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT snapshot_id,\n               user_id,\n               exchange,\n               currency,\n               equity           AS \"equity:           sqlx::types::BigDecimal\",\n               available        AS \"available:        sqlx::types::BigDecimal\",\n               isolated_equity  AS \"isolated_equity:  sqlx::types::BigDecimal\",\n               captured_at\n        FROM   balances\n        WHERE  user_id = $1\n        ORDER  BY captured_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "snapshot_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "exchange",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "currency",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "equity:           sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 5,
+        "name": "available:        sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "isolated_equity:  sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "captured_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "dcec840acdf4bf6f1e76d0a0bc449a7310f1191a3289df94216ad3e1b8634c41"
+}

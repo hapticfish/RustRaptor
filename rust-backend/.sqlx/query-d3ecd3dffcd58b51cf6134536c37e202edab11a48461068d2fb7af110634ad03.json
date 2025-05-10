@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT fee_id,\n               user_id,\n               exchange,\n               symbol,\n               fee_type   AS \"fee_type!:  FeeType\",\n               amount     AS \"amount:    sqlx::types::BigDecimal\",\n               reference_id,\n               occurred_at\n        FROM   fees\n        WHERE  user_id = $1\n        ORDER  BY occurred_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "fee_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "exchange",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "symbol",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "fee_type!:  FeeType",
+        "type_info": {
+          "Custom": {
+            "name": "fee_type_enum",
+            "kind": {
+              "Enum": [
+                "maker",
+                "taker",
+                "funding",
+                "rebate"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "amount:    sqlx::types::BigDecimal",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "reference_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "d3ecd3dffcd58b51cf6134536c37e202edab11a48461068d2fb7af110634ad03"
+}

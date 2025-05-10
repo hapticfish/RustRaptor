@@ -3,6 +3,7 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/rust-backend/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/rust-backend/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/rust-backend/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>

@@ -1,19 +1,42 @@
-# rust-backend/Dockerfile
-FROM rust:1.86.0
+
+
+# === BUILD ===  #
+
+FROM rust:1.86.0-bullseye AS builder
+
+RUN apt-get update -qq && apt-get install -y -qq curl
 
 WORKDIR /app
 
-# Copy source code (including .env)
-COPY . .
+ENV SQLX_OFFLINE=true
 
+COPY Cargo.toml Cargo.lock ./
 
-RUN apt-get update && apt-get install -y pkg-config libssl-dev
+COPY .sqlx ./sqlx
 
-
+COPY src ./src
+COPY tests ./tests
 COPY .env .env
 
-# Build the release binary
+COPY . .
+
 RUN cargo build --release
 
-# Run the app (adjust binary name if needed)
-CMD ["/app/target/release/rustraptor-backend"]
+
+# === RUNTIME ===#
+
+FROM debian:bullseye-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    apt-get clean
+
+WORKDIR /app
+RUN useradd -m appuser
+
+COPY --from=builder /app/target/release/rustraptor-backend /usr/local/bin/rustraptor-backend
+COPY .env .env
+
+USER appuser
+EXPOSE 8080
+CMD ["rustraptor-backend"]
