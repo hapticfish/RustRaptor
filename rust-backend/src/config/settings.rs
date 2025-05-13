@@ -10,6 +10,7 @@ pub struct Settings {
     pub app_mode: String,
     pub default_strategy: String,
     pub database_url: String,
+    pub redis_url: String,
 }
 
 impl Settings {
@@ -27,6 +28,8 @@ impl Settings {
         let app_mode = env::var("APP_MODE").map_err(|_| "APP_MODE missing")?.to_lowercase();
         let default_strategy = env::var("DEFAULT_STRATEGY").map_err(|_| "DEFAULT_STRATEGY missing")?;
         let database_url = env::var("DATABASE_URL").map_err(|_| "DATABASE_URL missing")?;
+        let redis_url = env::var("REDIS_URL")
+            .unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
 
         Ok(Self {
             server_port,

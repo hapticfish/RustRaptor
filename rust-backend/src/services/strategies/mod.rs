@@ -1,3 +1,3 @@
-mod mean_reversion;
+pub mod mean_reversion;
 mod trend_following;
 mod scalping;

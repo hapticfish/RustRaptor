@@ -31,7 +31,7 @@ sqlx = { version = "0.8", features = [
 ] }
 
 dotenv = "0.15"
-redis = { version = "0.23", features = ["tokio-comp"] }
+redis = { version = "0.25", features = ["tokio-comp", "connection-manager", "aio"] }
 
 log = "0.4"
 env_logger = "0.10"
@@ -41,3 +41,4 @@ tokio-tungstenite = "0.26.2"
 futures-util = "0.3.31"
 tungstenite = "0.26.2"
 bigdecimal = { version = "0.4", features = ["serde"] }
+thiserror = "2.0.12"

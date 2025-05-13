@@ -21,13 +21,18 @@ pub struct TradeRequest {
     pub size: f64,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct TradeResponse {
     pub success: bool,
+    pub exchange: Exchange,
+    pub symbol: String,
+    pub side: String,
+    pub order_type: String,
+    pub price: Option<f64>,
+    pub size: f64,
     pub data: Value,
 }
 
-/// Dispatches the trade to the right exchange client
 pub async fn execute_trade(
     req: TradeRequest,
     settings: &Settings,
@@ -48,6 +53,12 @@ pub async fn execute_trade(
                     .map_err(TradeError::Api)?;
             Ok(TradeResponse {
                 success: resp.code == "0",
+                exchange: req.exchange.clone(),
+                symbol: req.symbol,
+                side: req.side,
+                order_type: req.order_type,
+                price: req.price,
+                size: req.size,
                 data: resp.data,
             })
         }
