@@ -39,4 +39,11 @@ pub enum MakerTaker { Maker, Taker }
 #[sqlx(type_name = "fee_type_enum", rename_all = "lowercase")]
 pub enum FeeType { Maker, Taker, Funding, Rebate }
 
-
+impl<T: serde::Serialize> ApiResponse<T> {
+    pub fn ok(data: T) -> Self {
+        Self { success: true, message: None, data: Some(data) }
+    }
+    pub fn err(msg: &str) -> Self {
+        Self { success: false, message: Some(msg.into()), data: None }
+    }
+}

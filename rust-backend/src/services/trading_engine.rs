@@ -2,7 +2,7 @@
 
 use crate::config::settings::Settings;
 use crate::services::blowfin::api::{OrderRequest, BlowFinResponse};
-use crate::utils::errors::{TradeError, ApiError};
+pub(crate) use crate::utils::errors::{TradeError, ApiError};
 use serde_json::Value;
 
 #[derive(Debug, Clone)]

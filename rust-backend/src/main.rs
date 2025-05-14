@@ -1,16 +1,19 @@
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
+use actix_web::cookie::time::Duration;
 use sqlx::postgres::PgPoolOptions;
 use tokio;
 
 use rustraptor_backend::{
     config::settings::Settings,
-    services::strategies::mean_reversion::run_mean_reversion,
+    services::strategies::mean_reversion,
+    services::scheduler,
     db::redis::RedisPool,
     routes::{
         health::health_scope,
         trading::trading_scope,
         copy::copy_scope,
+        strategies::strategy_scope,
     },
     utils::route_debug::{dump_routes, request_info, param_test},
 };
@@ -36,41 +39,45 @@ async fn main() -> std::io::Result<()> {
     let port = settings.server_port;
     let settings_clone = settings.clone();
 
-    let pool = PgPoolOptions::new()
+    let pg_pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&settings.database_url)
         .await
-        .expect("Failed to open Postgres pool");
+        .expect("postgres");
 
     let redis_pool = RedisPool::new(&settings.redis_url)
         .await
-        .expect("Could not connect to Redis");
+        .expect("redis");
 
-    // 4) spawn your Bollinger mean-reversion loop
+    // --- scheduler reconciler ----------------------------------------------
     {
-        let redis_for_task = redis_pool.clone();
-        let settings_for_task = settings.clone();
+        let pg     = pg_pool.clone();
+        let redis  = redis_pool.clone();
+        let s_copy = settings.clone();
         tokio::spawn(async move {
-            let mut interval =
-                tokio::time::interval(tokio::time::Duration::from_secs(4 * 3600));
+            let mut iv = tokio::time::interval(std::time::Duration::from_secs(30));
             loop {
-                interval.tick().await;
-                run_mean_reversion(redis_for_task.clone(), settings_for_task.clone()).await;
+                iv.tick().await;
+                if let Err(e) = scheduler::reconcile(&pg, &redis, &s_copy).await {
+                    log::error!("scheduler: {e:?}");
+                }
             }
         });
     }
+
 
     HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
             .app_data(web::Data::new(settings_clone.clone()))
-            .app_data(web::Data::new(pool.clone()))
+            .app_data(web::Data::new(pg_pool.clone()))
             .app_data(web::Data::new(redis_pool.clone()))
 
             //scope
             .service(health_scope())
             .service(trading_scope())
             .service(copy_scope())
+            .service(strategy_scope())
 
             //degug
             .service(dump_routes)
@@ -82,3 +89,12 @@ async fn main() -> std::io::Result<()> {
         .run()
         .await
 }
+
+/*todo
+   find away to implement early close triggers for failed moves for each stratagies (premium feature)
+
+
+    for all stratagies review indetail with reasearch and refine the for bgest performance
+
+    adding customizable peramters as needed
+   */

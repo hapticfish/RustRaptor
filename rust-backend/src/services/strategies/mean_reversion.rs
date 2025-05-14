@@ -3,144 +3,114 @@
 use crate::{
     config::settings::Settings,
     db::redis::RedisPool,
-    services::trading_engine::{execute_trade, Exchange, TradeError, TradeRequest},
+    services::trading_engine::{execute_trade, Exchange, TradeRequest},
 };
 use bigdecimal::ToPrimitive;
 use chrono::{DateTime, Utc};
 use redis::RedisError;
 use serde::{Deserialize, Serialize};
+use crate::utils::errors::TradeError;
 
-/// How many candles to use & how many σ for the bands
-#[derive(Debug, Clone)]
-pub struct BollingerConfig {
-    pub period: usize,
-    pub std_dev_factor: f64,
+/// ---------- parameters persisted in `user_strategies.params` ---------
+#[derive(Clone, Deserialize)]
+pub struct MeanRevParams {
+    pub symbol: String,
+    #[serde(default = "def_period")] pub period: usize,
+    #[serde(default = "def_sigma")]  pub sigma:  f64,
+    #[serde(default = "def_size")]   pub size:   f64,
 }
+fn def_period() -> usize { 20 }
+fn def_sigma()  -> f64   { 2.0 }
+fn def_size()   -> f64   { 0.01 }
 
-/// OHLCV candle shape (4h)
-#[derive(Debug, Serialize, Deserialize, Clone)]
+/// ---------------------------- candle ---------------------------------
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Candle {
-    pub open: f64,
-    pub high: f64,
-    pub low: f64,
+    pub open:  f64,
+    pub high:  f64,
+    pub low:   f64,
     pub close: f64,
     pub volume: f64,
     pub timestamp: DateTime<Utc>,
 }
 
-#[derive(Debug)]
-pub enum Signal {
-    Buy,
-    Sell,
-    Hold,
+/// ----------------------- SMA / σ helpers -----------------------------
+pub fn bollinger(c: &[Candle], period: usize, k: f64) -> Option<(f64,f64,f64)> {
+    if c.len() < period { return None }
+    let slice = &c[c.len()-period..];
+    let sma   = slice.iter().map(|x| x.close).sum::<f64>() / period as f64;
+    let var   = slice.iter().map(|x| (x.close-sma).powi(2)).sum::<f64>() / period as f64;
+    let sd    = var.sqrt();
+    Some((sma, sma+k*sd, sma-k*sd))
 }
 
-/// Calculate mid, upper, lower bands. Returns None if insufficient data.
-pub fn calculate_bollinger(
-    candles: &[Candle],
-    cfg: &BollingerConfig,
-) -> Option<(f64, f64, f64)> {
-    if candles.len() < cfg.period {
-        return None;
-    }
+#[derive(Debug)] pub enum Signal { Buy, Sell, Hold }
 
-    let slice = &candles[candles.len() - cfg.period..];
-    let closes: Vec<f64> = slice.iter().map(|c| c.close).collect();
-    let sma = closes.iter().sum::<f64>() / cfg.period as f64;
-    let var = closes
-        .iter()
-        .map(|&p| (p - sma).powi(2))
-        .sum::<f64>()
-        / cfg.period as f64;
-    let std = var.sqrt();
-
-    let upper = sma + cfg.std_dev_factor * std;
-    let lower = sma - cfg.std_dev_factor * std;
-    Some((sma, upper, lower))
-}
-
-/// Turn bands + latest price into a discrete signal
-pub fn generate_signal(candles: &[Candle], cfg: &BollingerConfig) -> Signal {
-    if let Some((mid, _upper, lower)) = calculate_bollinger(candles, cfg) {
-        let price = candles.last().unwrap().close;
-        if price < lower {
-            Signal::Buy
-        } else if price >= mid {
-            Signal::Sell
-        } else {
-            Signal::Hold
+fn signal(candles:&[Candle], cfg:&MeanRevParams) -> Signal {
+    match bollinger(candles, cfg.period, cfg.sigma) {
+        Some((mid, _up, low)) => {
+            let p = candles.last().unwrap().close;
+            if p < low      { Signal::Buy  }
+            else if p>=mid  { Signal::Sell }
+            else            { Signal::Hold }
         }
-    } else {
-        Signal::Hold
+        None => Signal::Hold
     }
 }
 
-/// Fetch cached candles from Redis and deserialize
-async fn fetch_cached_candles(
-    redis: &RedisPool,
-    symbol: &str,
-) -> Result<Vec<Candle>, RedisError> {
-    let key = format!("candles:{symbol}:4h");
-    if let Some(v) = redis.get_json(&key).await? {
-        Ok(v)
-    } else {
-        Ok(vec![])
+/// --------------------- Redis candle cache ----------------------------
+async fn candles_from_cache(r:&RedisPool, sym:&str)->Result<Vec<Candle>,RedisError>{
+    let k = format!("candles:{sym}:4h");
+    Ok(r.get_json(&k).await?.unwrap_or_default())
+}
+
+/// ------------------------- trader ------------------------------------
+async fn act(
+    sig: Signal, cfg:&MeanRevParams, settings:&Settings
+) -> Result<(), TradeError>{
+    let side = match sig { Signal::Buy=>"buy", Signal::Sell=>"sell", _=>"hold" };
+    if side=="hold" { return Ok(()) }
+
+    execute_trade(
+        TradeRequest{
+            exchange: Exchange::Blowfin,
+            symbol:   cfg.symbol.clone(),
+            side:     side.into(),
+            order_type:"market".into(),
+            price: None,
+            size:  cfg.size,
+        },
+        settings
+    ).await.map(|_|())
+}
+
+/// one loop, used by `loop_forever`
+async fn one_iteration(
+    cfg:&MeanRevParams, redis:&RedisPool, settings:&Settings
+){
+    match candles_from_cache(redis, &cfg.symbol).await {
+        Ok(candles)=>{
+            let s = signal(&candles,cfg);
+            if let Err(e)= act(s,cfg,settings).await{
+                log::warn!("mean-rev act error: {e:?}");
+            }
+        }
+        Err(e)=>log::warn!("redis candle fetch err: {e:?}")
     }
 }
 
-/// Given a signal, fire a market trade for a fixed size
-async fn act_on_signal(
-    signal: Signal,
-    settings: &Settings,
-    size: f64,
-) -> Result<(), TradeError> {
-    if let Signal::Hold = signal {
-        return Ok(());
-    }
-
-    let side = match signal {
-        Signal::Buy => "buy",
-        Signal::Sell => "sell",
-        _ => unreachable!(),
-    };
-
-    let req = TradeRequest {
-        exchange: Exchange::Blowfin,
-        symbol: settings.default_strategy.clone(), // or pass symbol
-        side: side.into(),
-        order_type: "market".into(),
-        price: None,
-        size,
-    };
-
-    execute_trade(req, settings).await.map(|_| ())
-}
-
-/// Entry point, invoked on your chosen schedule
-pub async fn run_mean_reversion(
+/// =============  Tokio task  ==========================================
+pub async fn loop_forever(
+    row: crate::services::scheduler::StrategyRow,
     redis: RedisPool,
     settings: Settings,
-) {
-    let cfg = BollingerConfig {
-        period: 20,
-        std_dev_factor: 2.0,
-    };
+){
+    let params: MeanRevParams = serde_json::from_value(row.params)
+        .unwrap_or_else(|e| { log::error!("bad params: {e}"); std::process::exit(1) });
 
-    // 1. Fetch candles
-    let candles = match fetch_cached_candles(&redis, &settings.default_strategy).await {
-        Ok(c) => c,
-        Err(e) => {
-            log::error!("Failed to fetch candles from Redis: {}", e);
-            return;
-        }
-    };
-
-    // 2. Generate signal
-    let signal = generate_signal(&candles, &cfg);
-    log::info!("MeanReversion signal: {:?}", signal);
-
-    // 3. Act (0.01 size hard-coded for now)
-    if let Err(e) = act_on_signal(signal, &settings, 0.01).await {
-        log::error!("MeanReversion trade failed: {:?}", e);
+    let mut iv = tokio::time::interval(std::time::Duration::from_secs(4*3600));
+    loop {
+        one_iteration(&params,&redis,&settings).await;
+        iv.tick().await;
     }
 }
