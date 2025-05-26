@@ -1,29 +1,32 @@
-use std::{sync::Arc, time::Instant};
+//  src/db/redis.rs
 
+use std::{sync::Arc, time::Instant};
 use redis::{
-    aio::{ConnectionManager, MultiplexedConnection}, // async helpers
+    aio::{ConnectionManager},
     AsyncCommands, Client, RedisError, ToRedisArgs,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
 /// Thin, cheap-to-clone handle.
 #[derive(Clone)]
-pub struct RedisPool(Arc<ConnectionManager>);
+pub struct RedisPool {
+    manager: Arc<ConnectionManager>,
+}
 
 impl RedisPool {
     /// Build once at start-up and share via `.data()` in Actix.
     pub async fn new(url: &str) -> Result<Self, RedisError> {
         let client = Client::open(url)?;
-        let mgr    = client.get_connection_manager().await?;   // ✅ not deprecated
-        Ok(Self(Arc::new(mgr)))
+        let manager    = client.get_connection_manager().await?;
+        Ok(Self {
+            manager: Arc::new(manager),
+        })
     }
 
-    /// Obtain a *shareable* connection object.
-    #[inline]
-    async fn conn(&self) -> MultiplexedConnection {
-        // ConnectionManager implements `Deref<Target = MultiplexedConnection>`
-        (**self.0).clone()
+    fn manager(&self) -> Arc<ConnectionManager> {
+        self.manager.clone()
     }
+
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
     pub async fn set_json<K, T>(
@@ -33,23 +36,23 @@ impl RedisPool {
         ttl_secs: usize,
     ) -> Result<(), RedisError>
     where
-        K: ToRedisArgs,
+        K: ToRedisArgs + Send + Sync,
         T: Serialize,
     {
-        let mut con = self.conn().await;
+        let mut con = self.manager().as_ref().clone();
         let payload = serde_json::to_string(value)
             .map_err(|e| RedisError::from((redis::ErrorKind::TypeError, "serde", e.to_string())))?;
 
         let started = Instant::now();
         if ttl_secs == 0 {
-            redis::cmd("SET").arg(key).arg(payload).query_async(&mut con).await?;
+            redis::cmd("SET").arg(key).arg(payload).query_async::<_, ()>(&mut con).await?;
         } else {
             redis::cmd("SET")
                 .arg(key)
                 .arg(payload)
                 .arg("EX")
                 .arg(ttl_secs)
-                .query_async(&mut con)
+                .query_async::<_, ()>(&mut con)
                 .await?;
         }
         log::debug!("redis SET took {:?}", started.elapsed());
@@ -58,10 +61,10 @@ impl RedisPool {
 
     pub async fn get_json<K, T>(&self, key: K) -> Result<Option<T>, RedisError>
     where
-        K: ToRedisArgs,
+        K: ToRedisArgs + Send + Sync,
         T: DeserializeOwned,
     {
-        let mut con = self.conn().await;
+        let mut con = self.manager().as_ref().clone();
         let started = Instant::now();
         let raw: Option<String> = con.get(key).await?;
         log::debug!("redis GET took {:?}", started.elapsed());

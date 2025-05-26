@@ -1,3 +1,7 @@
+pub mod common;
+pub use common::{Candle, OrderBookSnapshot};
 pub mod mean_reversion;
-mod trend_following;
-mod scalping;
+pub mod trend_follow;
+pub mod vcsr;
+
+pub use vcsr::VcsrStrategy;

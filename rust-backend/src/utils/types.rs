@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{Type, postgres::PgTypeInfo};
+use sqlx::{Type};
 
 
 #[derive(Debug, Serialize)]

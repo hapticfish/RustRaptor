@@ -1,9 +1,11 @@
 // src/services/trading_engine.rs
 
-use crate::config::settings::Settings;
-use crate::services::blowfin::api::{OrderRequest, BlowFinResponse};
-pub(crate) use crate::utils::errors::{TradeError, ApiError};
+use crate::services::blowfin::api::{OrderRequest};
+use crate::services::risk;
+
+pub(crate) use crate::utils::errors::{TradeError};
 use serde_json::Value;
+use sqlx::PgPool;
 
 #[derive(Debug, Clone)]
 pub enum Exchange {
@@ -35,8 +37,15 @@ pub struct TradeResponse {
 
 pub async fn execute_trade(
     req: TradeRequest,
-    settings: &Settings,
+    db: &PgPool,
+    user_id: i64,
+    is_demo: bool,
+    master_key: &[u8],
 ) -> Result<TradeResponse, TradeError> {
+
+    risk::check_slippage(0.0)?;
+
+
     match req.exchange {
         Exchange::Blowfin => {
             let order_req = OrderRequest {
@@ -47,10 +56,17 @@ pub async fn execute_trade(
                 price: req.price.map(|p| p.to_string()),
                 size: req.size.to_string(),
             };
-            let resp: BlowFinResponse =
-                crate::services::blowfin::api::place_order(settings, &order_req)
-                    .await
-                    .map_err(TradeError::Api)?;
+
+            let resp = crate::services::blowfin::api::place_order(
+                db,
+                user_id,
+                &order_req,
+                is_demo,
+                master_key
+            )
+                .await
+                .map_err(TradeError::Api)?;
+
             Ok(TradeResponse {
                 success: resp.code == "0",
                 exchange: req.exchange.clone(),

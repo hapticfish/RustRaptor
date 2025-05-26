@@ -1,3 +1,3 @@
 pub(crate) mod api;
-mod auth;
-mod ws;
+pub mod auth;
+pub mod ws;

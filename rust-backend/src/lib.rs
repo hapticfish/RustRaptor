@@ -10,11 +10,18 @@ pub mod routes {
 pub mod services {
     pub mod scheduler;
     pub mod trading_engine;
+    pub mod market_data;
 
+    pub mod risk;
+
+    pub mod blowfin;
     pub mod copy_trading;
     pub mod strategies {
+        pub mod common;
+        pub use common::{Candle, OrderBookSnapshot};
         pub mod mean_reversion;
-        // trend_follow, vscr …
+        pub mod trend_follow;
+        pub mod vcsr;
     }
 }
 

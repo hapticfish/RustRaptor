@@ -1,9 +1,8 @@
 // src/routes/trading.rs
 
-use actix_web::{post, get, web, HttpResponse, Responder, Scope};
+use actix_web::{post, get, web, HttpResponse, Responder, HttpMessage};
 use serde::Deserialize;
-use actix_web::dev::{HttpServiceFactory, ServiceFactory, ServiceRequest, ServiceResponse};
-use actix_web::Error;
+use actix_web::dev::{HttpServiceFactory};
 use crate::config::settings::Settings;
 use crate::services::trading_engine::{execute_trade, Exchange, TradeRequest, TradeResponse};
 use crate::services::blowfin::api::get_balance;
@@ -25,6 +24,8 @@ pub struct TradeParams {
 pub async fn trade(
     params: web::Json<TradeParams>,
     settings: web::Data<Settings>,
+    db: web::Data<sqlx::PgPool>,
+    req: actix_web::HttpRequest,
 ) -> impl Responder {
     let exchange = match params.exchange.to_lowercase().as_str() {
         "blowfin" => Exchange::Blowfin,
@@ -37,7 +38,19 @@ pub async fn trade(
         }
     };
 
-    let req = TradeRequest {
+    // --- Extract user_id from JWT extension (auth middleware puts it there) ---
+    let user_id: i64 = req.extensions().get::<String>()
+        .and_then(|uid_str| uid_str.parse::<i64>().ok())
+        .unwrap_or(0); // You may want to error if missing
+
+    // -- Demo flag, could also be per-user (here: from settings) --
+    let is_demo = settings.is_demo();
+
+    // -- Your master key for decryption (from ENV or secret management) --
+    let master_key = std::env::var("MASTER_KEY").unwrap_or_default();
+    let master_key_bytes = master_key.as_bytes();
+
+    let req_struct = TradeRequest {
         exchange,
         symbol: params.symbol.clone(),
         side: params.side.clone(),
@@ -46,7 +59,13 @@ pub async fn trade(
         size: params.size,
     };
 
-    match execute_trade(req, &settings).await {
+    match execute_trade(
+        req_struct,
+        db.as_ref(),
+        user_id,
+        is_demo,
+        master_key_bytes,
+    ).await {
         Ok(resp) => HttpResponse::Ok().json(ApiResponse::<TradeResponse> {
             success: true,
             message: Some("Trade executed successfully".to_string()),
@@ -63,8 +82,23 @@ pub async fn trade(
 #[get("/balance")]
 pub async fn balance(
     settings: web::Data<Settings>,
+    db: web::Data<sqlx::PgPool>,
+    req: actix_web::HttpRequest,
 ) -> impl Responder {
-    match get_balance(&settings).await {
+    let user_id: i64 = req.extensions().get::<String>()
+        .and_then(|uid_str| uid_str.parse::<i64>().ok())
+        .unwrap_or(0);
+
+    let is_demo = settings.is_demo();
+    let master_key = std::env::var("MASTER_KEY").unwrap_or_default();
+    let master_key_bytes = master_key.as_bytes();
+
+    match get_balance(
+        db.as_ref(),
+        user_id,
+        is_demo,
+        master_key_bytes,
+    ).await {
         Ok(resp) => HttpResponse::Ok().json(ApiResponse::<Value> {
             success: true,
             message: Some("Balance fetched successfully".to_string()),

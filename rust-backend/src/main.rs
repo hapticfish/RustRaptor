@@ -3,20 +3,14 @@ use actix_web::{middleware::Logger, web, App, HttpServer};
 use actix_web::cookie::time::Duration;
 use sqlx::postgres::PgPoolOptions;
 use tokio;
+use rustraptor_backend::services::risk;
 
-use rustraptor_backend::{
-    config::settings::Settings,
-    services::strategies::mean_reversion,
-    services::scheduler,
-    db::redis::RedisPool,
-    routes::{
-        health::health_scope,
-        trading::trading_scope,
-        copy::copy_scope,
-        strategies::strategy_scope,
-    },
-    utils::route_debug::{dump_routes, request_info, param_test},
-};
+use rustraptor_backend::{config::settings::Settings, services::strategies::mean_reversion, services::scheduler, db::redis::RedisPool, routes::{
+    health::health_scope,
+    trading::trading_scope,
+    copy::copy_scope,
+    strategies::strategy_scope,
+}, utils::route_debug::{dump_routes, request_info, param_test}, services};
 
 
 fn init_logging() {
@@ -36,6 +30,7 @@ async fn main() -> std::io::Result<()> {
         std::process::exit(1);
     });
 
+    let bus = services::market_data::spawn_all_feeds(&settings).await;
     let port = settings.server_port;
     let settings_clone = settings.clone();
 
@@ -49,16 +44,19 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("redis");
 
+    risk::spawn_guardian(pg_pool.clone(), redis_pool.clone());
+
     // --- scheduler reconciler ----------------------------------------------
     {
         let pg     = pg_pool.clone();
         let redis  = redis_pool.clone();
         let s_copy = settings.clone();
+        let bus_c  = bus.clone();
         tokio::spawn(async move {
             let mut iv = tokio::time::interval(std::time::Duration::from_secs(30));
             loop {
                 iv.tick().await;
-                if let Err(e) = scheduler::reconcile(&pg, &redis, &s_copy).await {
+                if let Err(e) = scheduler::reconcile(&pg, &redis, &s_copy, &bus_c).await {
                     log::error!("scheduler: {e:?}");
                 }
             }
@@ -69,9 +67,11 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
+            .wrap(rustraptor_backend::middleware::Auth)
             .app_data(web::Data::new(settings_clone.clone()))
             .app_data(web::Data::new(pg_pool.clone()))
             .app_data(web::Data::new(redis_pool.clone()))
+            .app_data(web::Data::new(bus.clone()))
 
             //scope
             .service(health_scope())

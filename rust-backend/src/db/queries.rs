@@ -1,7 +1,5 @@
 use sqlx::{PgPool, Result};
-use crate::utils::types::*;
 use uuid::Uuid;
-use sqlx::types::BigDecimal;
 use crate::{
     db::models::*,
     utils::types::{FeeType, MakerTaker, MarketType, OrderStatus, OrderType},
@@ -43,14 +41,14 @@ pub async fn get_api_keys_for_user(pool: &PgPool, user_id: i64) -> Result<Vec<Ap
 
 /* --------------------- STRATEGIES ---------------------- */
 
-pub async fn get_active_strategies(pool: &PgPool, user_id: i64) -> Result<Vec<Strategy>> {
+pub async fn get_active_strategies(pool: &PgPool, user_id: i64) -> Result<Vec<UserStrategy>> {
     sqlx::query_as!(
-        Strategy,
+        UserStrategy,
         r#"
-        SELECT strategy_id, user_id, name, params, active, updated_at
-        FROM   strategies
+        SELECT strategy_id, user_id, name, params, status, created_at
+        FROM   user_strategies
         WHERE  user_id = $1
-        AND    active  = TRUE
+        AND    status  = 'enabled'
         "#,
         user_id
     )

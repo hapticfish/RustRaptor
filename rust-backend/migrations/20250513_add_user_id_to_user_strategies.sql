@@ -1,0 +1,2 @@
+ALTER TABLE user_strategies
+    ADD COLUMN IF NOT EXISTS user_id BIGINT NOT NULL DEFAULT 0;

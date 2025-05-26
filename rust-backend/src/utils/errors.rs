@@ -12,6 +12,7 @@ pub enum ApiError {
     Json(serde_json::Error),
     WebSocket(WsError),
     Other(String),
+    Custom(String),
 }
 
 impl fmt::Display for ApiError {
@@ -21,6 +22,7 @@ impl fmt::Display for ApiError {
             ApiError::Json(e)      => write!(f, "JSON error: {}", e),
             ApiError::WebSocket(e) => write!(f, "WebSocket error: {}", e),
             ApiError::Other(msg)   => write!(f, "{}", msg),
+            ApiError::Custom(msg)  => write!(f, "Custom error: {}", msg),
         }
     }
 }
@@ -32,6 +34,7 @@ impl Error for ApiError {
             ApiError::Json(e)      => Some(e),
             ApiError::WebSocket(e) => Some(e),
             ApiError::Other(_)     => None,
+            ApiError::Custom(_)    => None,
         }
     }
 }
@@ -39,6 +42,12 @@ impl Error for ApiError {
 // Conversions from underlying errors into ApiError
 impl From<reqwest::Error> for ApiError {
     fn from(err: reqwest::Error) -> Self { ApiError::Http(err) }
+}
+
+impl From<sqlx::Error> for ApiError {
+    fn from(err: sqlx::Error) -> Self {
+        ApiError::Other(format!("Database error: {}", err))
+    }
 }
 impl From<serde_json::Error> for ApiError {
     fn from(err: serde_json::Error) -> Self { ApiError::Json(err) }

@@ -1,11 +1,9 @@
-use actix_web::{web, App, HttpServer, HttpResponse, Responder, get};
-use std::collections::HashSet;
+use actix_web::{web, HttpResponse, Responder, get};
 
-// Function to dump all registered routes - this is for testing only
+
 #[get("/debug/routes")]
 pub async fn dump_routes() -> impl Responder {
-    // This is a hack - we can't easily access internal route registry
-    // So we'll return a static list of routes we know exist
+
     let routes = vec![
         "GET /health",
         "GET /api/test",

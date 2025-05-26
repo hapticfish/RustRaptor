@@ -40,10 +40,10 @@ pub struct ExchangeAccount {
     pub demo: Option<bool>,
 }
 
-/* ------------------------- STRATEGIES ---------------------- */
+/* ------------------------- STRATEGIES DEPRECATED ---------------------- */
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
-pub struct Strategy {
+pub struct StrategyDeprecated {
     pub strategy_id: Uuid,
     pub user_id: i64,
     pub name: String,
@@ -167,4 +167,16 @@ pub struct AuditLog {
     pub action: String,
     pub details: Option<serde_json::Value>,
     pub ts: Option<DateTime<Utc>>,
+}
+
+/* -------------------------- User Strategies ---------------------- */
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct UserStrategy {
+    pub strategy_id: Uuid,
+    pub user_id: i64,
+    pub name: String,
+    pub params: serde_json::Value,
+    pub status: String,
+    pub created_at: Option<DateTime<Utc>>,
 }

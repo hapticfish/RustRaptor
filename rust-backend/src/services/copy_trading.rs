@@ -1,12 +1,13 @@
 
 //  src/services/copy_trading.rs
 
-use std::{fmt, time::Duration};
+// use std::{fmt, time::Duration};
 
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
-use sqlx::{postgres::PgRow, PgPool, Row};
+use sqlx::{postgres::PgPool};
 use uuid::Uuid;
+use crate::services::risk;
 
 use crate::{
     db::redis::RedisPool,
@@ -144,11 +145,24 @@ pub async fn replicate_to_followers(
     redis: &RedisPool,
     leader_id: i64,
     leader_fill: &TradeResponse,
+    settings: &crate::config::settings::Settings,
 ) -> Result<(), CopyError> {
     let followers = followers_for_leader(pg, redis, leader_id).await?;
 
+    // -- Grab master key (for decrypting each follower’s API key) --
+    let master_key = std::env::var("MASTER_KEY").unwrap_or_default();
+    let master_key_bytes = master_key.as_bytes();
+
+    let is_demo = settings.is_demo();
+
     for fid in followers {
-        // naïve 1-for-1 copy; in practise scale, slippage & balance checks apply
+
+        if let Err(e) = risk::check_drawdown(redis, fid).await {
+            log::warn!("follower {fid}: DD limit hit – skipping copy: {e}");
+            continue;                                     // just skip this follower
+        }
+
+        // naïve 1-for-1 copy; in practice scale, slippage & balance checks apply
         let req = TradeRequest {
             exchange: leader_fill.exchange.clone(),
             symbol: leader_fill.symbol.clone(),
@@ -157,8 +171,15 @@ pub async fn replicate_to_followers(
             price: leader_fill.price,
             size: leader_fill.size,
         };
-        // ignore individual failures but capture a metric
-        if let Err(e) = execute_trade(req, pg).await {
+
+        // Now, execute for the follower!
+        if let Err(e) = execute_trade(
+            req,
+            pg,          // Pass DB connection
+            fid,         // Follower's user ID
+            is_demo,
+            master_key_bytes,
+        ).await {
             log::warn!("copy trade for follower {} failed: {}", fid, e);
         }
     }
