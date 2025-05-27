@@ -23,10 +23,10 @@
 
 
 use chrono::{DateTime, Timelike, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use crate::services::strategies::{Candle, OrderBookSnapshot};
-use statrs::statistics::{Data as StatsData, Statistics};
+use statrs::statistics::{Data as StatsData, Distribution};
 use crate::db::redis::RedisPool;
 use crate::services::market_data::MarketBus;
 use crate::services::trading_engine::{execute_trade, Exchange, TradeRequest};
@@ -77,7 +77,7 @@ impl Default for VcsrConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub enum TradingSession { AsiaOpen, NyOpen }
 
 // ============================================================
@@ -175,20 +175,33 @@ fn intraday_vwap(hist: &[Candle], win: usize) -> Option<Vwap> {
     let (mut pv, mut vol, mut prices) = (0.0,0.0,Vec::with_capacity(win));
     for c in slice { pv += c.close*c.volume; vol += c.volume; prices.push(c.close); }
     let m = pv / vol.max(1e-8);
-    Some(Vwap { mean: m, std_dev: StatsData::new(prices).std_dev() })
+    Some(Vwap {
+        mean: m,
+        std_dev: StatsData::new(prices.clone()).std_dev()?,
+    })
 }
 
 fn volume_spike(recent:&[Candle], cfg:&VcsrConfig)->bool{
     let latest=recent.last().unwrap();
-    let vols :Vec<f64>=recent.iter().map(|c|c.volume).collect();
+    let mut vols :Vec<f64>=recent.iter().map(|c|c.volume).collect();
     let ma   = vols.iter().sum::<f64>()/vols.len() as f64;
     if latest.volume < cfg.vol_ma_mult * ma {return false;}
 
     let data = StatsData::new(vols.clone());
-    if (latest.volume - data.mean())/data.std_dev() < cfg.vol_zscore {return false;}
+    let mean = data.mean().unwrap_or(0.0);
+    let std  = data.std_dev().unwrap_or(1e-9);      // never divide by zero
 
-    let mut sorted=vols; sorted.sort_by(|a,b|a.partial_cmp(b).unwrap());
-    let rank = sorted.iter().position(|&v|v>=latest.volume).unwrap_or(sorted.len()) as f64 / sorted.len() as f64;
+    if (latest.volume - mean) / std < cfg.vol_zscore {
+        return false;
+    }
+
+    vols.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let rank = vols
+        .iter()
+        .position(|&v| v >= latest.volume)
+        .unwrap_or(vols.len()) as f64
+        / vols.len() as f64;
+
     rank >= cfg.vol_percentile
 }
 
@@ -321,13 +334,14 @@ mod robust {
             let rets: Vec<f64> = curve.windows(2)
                 .map(|w| (w[1] - w[0]) / w[0])
                 .collect();
-            let stats = StatsData::new(rets);
+            let stats = StatsData::new(rets.clone());
             let sd     = stats.std_dev().unwrap_or(1e-6).max(1e-6);
-            let sharpe = stats.mean() / sd * (252f64).sqrt();
+            let mu    = stats.mean().unwrap_or(0.0);
+            let sharpe = mu / sd * (252_f64).sqrt();
             sharpes.push(sharpe);
         }
 
-        let avg = StatsData::new(sharpes).mean().unwrap_or(0.0);
+        let avg = StatsData::new(&sharpes[..]).mean().unwrap_or(0.0);
         println!("ROBUST-TEST   avg Sharpe = {:.2}", avg);
     }
 }

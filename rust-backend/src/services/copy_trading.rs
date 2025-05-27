@@ -66,10 +66,10 @@ pub async fn add_follower(
         .await?;
 
 
-    let key = redis.with_prefix("copy", leader_id);
-    let mut conn = redis.connection().await;
+    let key = redis.with_prefix("copy", leader_id.to_string());
+    let mut conn = redis.manager().as_ref().clone();
     conn.sadd(&key, follower_id).await?;
-    conn.expire(&key, FOLLOWER_SET_TTL).await?;
+    conn.expire(&key, FOLLOWER_SET_TTL as i64).await?;
     Ok(())
 }
 
@@ -94,8 +94,8 @@ pub async fn remove_follower(
         .execute(pg)
         .await?;
 
-    let key = redis.with_prefix("copy", leader_id);
-    let mut conn = redis.connection().await;
+    let key = redis.with_prefix("copy", leader_id.to_string());
+    let mut conn = redis.manager().as_ref().clone();
     conn.srem(&key, follower_id).await?;
     Ok(())
 }
@@ -106,10 +106,10 @@ pub async fn followers_for_leader(
     redis: &RedisPool,
     leader_id: i64,
 ) -> Result<Vec<i64>, CopyError> {
-    let key = redis.with_prefix("copy", leader_id);
-    let mut conn = redis.connection().await;
+    let key = redis.with_prefix("copy", leader_id.to_string());
+    let mut conn = redis.manager().as_ref().clone();
 
-    if let Ok::<Vec<i64>, _>(ids) = conn.smembers(&key).await {
+    if let Ok(ids) = conn.smembers::<_, Vec<i64>>(&key).await {
         if !ids.is_empty() {
             return Ok(ids);
         }
@@ -130,7 +130,7 @@ pub async fn followers_for_leader(
     let followers: Vec<i64> = rows.into_iter().map(|r| r.0).collect();
     if !followers.is_empty() {
         conn.sadd(&key, &followers).await?;
-        conn.expire(&key, FOLLOWER_SET_TTL).await?;
+        conn.expire(&key, FOLLOWER_SET_TTL as i64).await?;
     }
     Ok(followers)
 }

@@ -62,6 +62,7 @@ pub enum TradeError {
     Api(ApiError),
     InvalidRequest(String),
     Other(String),
+    RiskViolation(String),
 }
 
 impl fmt::Display for TradeError {
@@ -69,6 +70,7 @@ impl fmt::Display for TradeError {
         match self {
             TradeError::Api(e)             => write!(f, "API error: {}", e),
             TradeError::InvalidRequest(msg)=> write!(f, "Invalid request: {}", msg),
+            TradeError::RiskViolation(msg)   => write!(f, "Risk violation: {}", msg),
             TradeError::Other(msg)         => write!(f, "{}", msg),
         }
     }

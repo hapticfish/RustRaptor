@@ -1,7 +1,6 @@
 // src/services/strategies/mean_reversion.rs
 
 use crate::{
-    config::settings::Settings,
     db::redis::RedisPool,
     services::{
         market_data::MarketBus,
@@ -59,7 +58,6 @@ pub async fn loop_forever(
     row: crate::services::scheduler::StrategyRow,
     redis: RedisPool,
     db: PgPool,
-    settings: Settings,
     bus: MarketBus,
     master_key: Vec<u8>,     // Pass master key in at job start
     is_demo: bool,
@@ -81,8 +79,8 @@ pub async fn loop_forever(
 
         match decide(&hist, &cfg) {
             Sig::Hold => {}
-            Sig::Buy  => trade("buy", &cfg, &redis, &db, user_id, is_demo, &master_key, &settings).await,
-            Sig::Sell => trade("sell", &cfg, &redis, &db, user_id, is_demo, &master_key, &settings).await,
+            Sig::Buy  => trade("buy", &cfg, &redis, &db, user_id, is_demo, &master_key).await,
+            Sig::Sell => trade("sell", &cfg, &redis, &db, user_id, is_demo, &master_key).await,
         }
 
         // cache last 400 bars in Redis (optional, useful for other services)

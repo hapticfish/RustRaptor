@@ -23,7 +23,7 @@ impl RedisPool {
         })
     }
 
-    fn manager(&self) -> Arc<ConnectionManager> {
+    pub(crate) fn manager(&self) -> Arc<ConnectionManager> {
         self.manager.clone()
     }
 

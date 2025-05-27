@@ -45,11 +45,11 @@ pub async fn record_fill(
     user_id: i64,
     realised_pnl_usd: f64,
 ) -> redis::RedisResult<()> {
-    let key = redis.with_prefix("dd", user_id);
-    let mut conn = redis.connection().await;
+    let key = redis.with_prefix("dd", user_id.to_string());
+    let mut conn = redis.manager().as_ref().clone();
     let entry = format!("{}|{:.8}", Utc::now().timestamp(), realised_pnl_usd);
-    conn.lpush(&key, entry).await?;
-    conn.expire(&key, REDIS_TTL).await?;
+    conn.lpush::<_, _, ()>(&key, entry).await?;
+    conn.expire::<_, ()>(&key, REDIS_TTL as i64).await?;
     Ok(())
 }
 
@@ -58,8 +58,8 @@ pub async fn check_drawdown(
     redis: &RedisPool,
     user_id: i64,
 ) -> Result<(), TradeError> {
-    let key     = redis.with_prefix("dd", user_id);
-    let mut conn= redis.connection().await;
+    let key     = redis.with_prefix("dd", user_id.to_string());
+    let mut conn = redis.manager().as_ref().clone();
     let rows: Vec<String> = conn.lrange(&key, 0, -1).await.unwrap_or_default();
 
     let cutoff = Utc::now().timestamp() - LOOKBACK_SECS;

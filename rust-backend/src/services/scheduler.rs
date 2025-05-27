@@ -40,6 +40,9 @@ pub async fn reconcile(
         .fetch_all(pg)
         .await?;
 
+    let master_key = std::env::var("MASTER_KEY").unwrap_or_default().into_bytes();
+    let is_demo = settings.is_demo();
+
     // ---------------------------------------------------------
     // 2. Spawn missing tasks
     // ---------------------------------------------------------
@@ -50,17 +53,19 @@ pub async fn reconcile(
 
         let r  = row.clone();
         let rd = redis.clone();
-        let st = settings.clone();
         let bus_clone = bus.clone();
+        let db = pg.clone();
+        let master_key = master_key.clone();
+        let is_demo = is_demo;
 
         let (fut, abort) = abortable(tokio::spawn(async move {
             match r.name.as_str() {
                 "mean_reversion" =>
-                    strategies::mean_reversion::loop_forever(r, rd, st, bus_clone).await,
+                    strategies::mean_reversion::loop_forever(r, rd, db, bus_clone, master_key, is_demo).await,
                 "trend_follow"   =>
-                    strategies::trend_follow  ::loop_forever(r, rd, st, bus_clone).await,
+                    strategies::trend_follow::loop_forever(r, rd, db, bus_clone, master_key, is_demo).await,
                 "vcsr"           =>
-                    strategies::vcsr          ::loop_forever(r, rd, st, bus_clone).await,
+                    strategies::vcsr::loop_forever(r, rd, db, bus_clone, master_key, is_demo).await,
                 other => log::warn!("scheduler: unknown strategy '{other}'"),
             }
         }));

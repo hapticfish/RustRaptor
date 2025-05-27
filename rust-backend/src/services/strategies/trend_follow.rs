@@ -5,7 +5,6 @@ use serde::{Deserialize};
 use sqlx::PgPool;
 
 use crate::{
-    config::settings::Settings,
     db::redis::RedisPool,
     services::{
         market_data::MarketBus,
@@ -36,7 +35,6 @@ pub async fn loop_forever(
     row: crate::services::scheduler::StrategyRow,
     redis: RedisPool,
     db: PgPool,
-    settings: Settings,
     bus: MarketBus,
     master_key: Vec<u8>,
     is_demo: bool,
@@ -76,7 +74,7 @@ pub async fn loop_forever(
                 if daily.len() > cfg.slow as usize + 10 {
                     daily.remove(0);
                 }
-                evaluate(&daily, &cfg, &redis, &db, &settings, user_id, &master_key, is_demo).await;
+                evaluate(&daily, &cfg, &redis, &db, user_id, &master_key, is_demo).await;
             }
         }
     }
@@ -89,7 +87,6 @@ async fn evaluate(
     cfg: &TrendParams,
     redis: &RedisPool,
     db: &PgPool,
-    settings: &Settings,
     user_id: i64,
     master_key: &[u8],
     is_demo: bool,
@@ -132,12 +129,12 @@ async fn evaluate(
     match (in_pos, fast > slow, price >= don_h, price <= don_l) {
         // --- Exit ---
         (true, _, _, exit) if exit => {
-            trade("sell", cfg, &redis, db, user_id, is_demo, master_key, settings).await;
+            trade("sell", cfg, &redis, db, user_id, is_demo, master_key).await;
             let _ = redis.set_json(&pos_key, &false, 0).await;
         }
         // --- Entry ---
         (false, true, entry, _) if entry => {
-            trade("buy", cfg, &redis, db, user_id, is_demo, master_key, settings).await;
+            trade("buy", cfg, &redis, db, user_id, is_demo, master_key).await;
             let _ = redis.set_json(&pos_key, &true, 3600 * 24 * 30).await;
         }
         _ => {} // hold
