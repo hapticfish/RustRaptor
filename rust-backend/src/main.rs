@@ -1,11 +1,10 @@
 
 use actix_web::{middleware::Logger, web, App, HttpServer};
-use actix_web::cookie::time::Duration;
 use sqlx::postgres::PgPoolOptions;
 use tokio;
 use rustraptor_backend::services::risk;
 
-use rustraptor_backend::{config::settings::Settings, services::strategies::mean_reversion, services::scheduler, db::redis::RedisPool, routes::{
+use rustraptor_backend::{config::settings::Settings,services::scheduler, db::redis::RedisPool, routes::{
     health::health_scope,
     trading::trading_scope,
     copy::copy_scope,

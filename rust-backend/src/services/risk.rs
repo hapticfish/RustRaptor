@@ -25,7 +25,6 @@ const LOOKBACK_SECS:    i64 = 86_400; // 24 h
 const REDIS_TTL:        usize = (LOOKBACK_SECS as usize) + 600; // keep a bit longer
 
 /// ─── Public helpers ──────────────────────────────────────────────────────
-
 /// Pre-trade slippage guard (caller passes their own estimate)
 #[inline]
 pub fn check_slippage(estimated_bps: f64) -> Result<(), TradeError> {

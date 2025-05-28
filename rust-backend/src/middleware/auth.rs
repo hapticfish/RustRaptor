@@ -6,6 +6,8 @@ use futures_util::future::{ok, LocalBoxFuture, Ready};
 use futures_util::FutureExt;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::Deserialize;
+use std::rc::Rc;
+use std::marker::PhantomData;
 
 use crate::utils::signature::verify_hmac;
 
@@ -17,30 +19,36 @@ struct StdClaims {
 
 pub struct Auth;
 
-impl<S> Transform<S, ServiceRequest> for Auth
+impl<S, B> Transform<S, ServiceRequest> for Auth
 where
-    S: Service<ServiceRequest, Response = ServiceResponse, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    B: 'static,
 {
-    type Response  = ServiceResponse;
+    type Response  = ServiceResponse<B>;
     type Error     = Error;
     type InitError = ();
-    type Transform = AuthMw<S>;
+    type Transform = AuthMw<S, B>;
     type Future    = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, srv: S) -> Self::Future {
-        ok(AuthMw { inner: srv })
+        ok(AuthMw {
+            inner: Rc::new(srv),
+            _body: PhantomData,
+        })
     }
 }
 
-pub struct AuthMw<S> {
-    inner: S,
+pub struct AuthMw<S, B> {
+    inner: Rc<S>,
+    _body: PhantomData<B>,
 }
 
-impl<S> Service<ServiceRequest> for AuthMw<S>
+impl<S, B> Service<ServiceRequest> for AuthMw<S, B>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse, Error = Error> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    B: 'static,
 {
-    type Response = ServiceResponse;
+    type Response = ServiceResponse<B>;
     type Error    = Error;
     type Future   = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -53,6 +61,7 @@ where
 
     fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let is_get = req.method() == actix_web::http::Method::GET;
+        let inner = self.inner.clone();
 
         let fut = async move {
             // --- 1. Buffer body if non‑GET -------------------------------------
@@ -99,7 +108,7 @@ where
                         req.extensions_mut().insert(uid);
                     }
                 }
-                self.inner.call(req).await
+                inner.call(req).await
             } else {
                 Err(actix_web::error::ErrorUnauthorized("auth failed"))
             }

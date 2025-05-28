@@ -62,8 +62,8 @@ pub fn verify_hmac(req: &ServiceRequest) -> bool {
     }
 
     // --- Read request payload (from extensions) ---
-    let body_bytes: &[u8] = req
-        .extensions()
+    let extensions = req.extensions();
+    let body_bytes: &[u8] = extensions
         .get::<Vec<u8>>()
         .map(|v| v.as_slice())
         .unwrap_or(&[]);
@@ -89,7 +89,7 @@ pub fn verify_hmac(req: &ServiceRequest) -> bool {
         }
     };
 
-    let valid = calc.ct_eq(&given).into();
+    let valid: bool = calc.ct_eq(&given).into();
     if !valid {
         warn!("HMAC signature mismatch");
     }

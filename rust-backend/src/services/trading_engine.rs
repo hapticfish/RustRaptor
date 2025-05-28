@@ -7,7 +7,7 @@ pub(crate) use crate::utils::errors::{TradeError};
 use serde_json::Value;
 use sqlx::PgPool;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum Exchange {
     Blowfin,
     // Future: Binance, Coinbase, etc.

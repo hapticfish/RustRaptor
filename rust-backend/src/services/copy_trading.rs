@@ -68,8 +68,8 @@ pub async fn add_follower(
 
     let key = redis.with_prefix("copy", leader_id.to_string());
     let mut conn = redis.manager().as_ref().clone();
-    conn.sadd(&key, follower_id).await?;
-    conn.expire(&key, FOLLOWER_SET_TTL as i64).await?;
+    conn.sadd::<_, _, ()>(&key, follower_id).await?;
+    conn.expire::<_, ()>(&key, FOLLOWER_SET_TTL as i64).await?;
     Ok(())
 }
 
@@ -96,7 +96,7 @@ pub async fn remove_follower(
 
     let key = redis.with_prefix("copy", leader_id.to_string());
     let mut conn = redis.manager().as_ref().clone();
-    conn.srem(&key, follower_id).await?;
+    conn.srem::<_, _, ()>(&key, follower_id).await?;
     Ok(())
 }
 
@@ -129,8 +129,8 @@ pub async fn followers_for_leader(
 
     let followers: Vec<i64> = rows.into_iter().map(|r| r.0).collect();
     if !followers.is_empty() {
-        conn.sadd(&key, &followers).await?;
-        conn.expire(&key, FOLLOWER_SET_TTL as i64).await?;
+        conn.sadd::<_, _, ()>(&key, &followers).await?; // <--- annotate type as ()
+        conn.expire::<_, ()>(&key, FOLLOWER_SET_TTL as i64).await?;
     }
     Ok(followers)
 }

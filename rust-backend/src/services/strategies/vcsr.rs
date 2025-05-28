@@ -341,7 +341,7 @@ mod robust {
             sharpes.push(sharpe);
         }
 
-        let avg = StatsData::new(&sharpes[..]).mean().unwrap_or(0.0);
+        let avg = StatsData::new(sharpes.clone()).mean().unwrap_or(0.0);
         println!("ROBUST-TEST   avg Sharpe = {:.2}", avg);
     }
 }

@@ -39,6 +39,7 @@ impl Settings {
             app_mode,
             default_strategy,
             database_url,
+            redis_url,
         })
     }
 
