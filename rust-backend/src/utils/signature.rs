@@ -1,12 +1,12 @@
 //! HMAC helpers for the X-RR-SIG header (hardened version)
 
 use actix_web::dev::ServiceRequest;
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
-use subtle::ConstantTimeEq;
-use std::time::{SystemTime, UNIX_EPOCH};
 use actix_web::HttpMessage;
+use hmac::{Hmac, Mac};
 use log::warn;
+use sha2::Sha256;
+use std::time::{SystemTime, UNIX_EPOCH};
+use subtle::ConstantTimeEq;
 
 /// Maximum allowed clock skew (seconds)
 const MAX_SKEW_SECS: i64 = 10;
@@ -57,7 +57,10 @@ pub fn verify_hmac(req: &ServiceRequest) -> bool {
         .unwrap_or(0);
 
     if (ts - now).abs() > MAX_SKEW_SECS {
-        warn!("X-RR-TIMESTAMP out of allowed skew (got {}, now {})", ts, now);
+        warn!(
+            "X-RR-TIMESTAMP out of allowed skew (got {}, now {})",
+            ts, now
+        );
         return false;
     }
 
@@ -98,13 +101,15 @@ pub fn verify_hmac(req: &ServiceRequest) -> bool {
 
 /// Direct byte-slice variant – used for WS frames
 pub fn verify_hmac_bytes(body: &[u8], secret: &str, sig_hex: &str) -> bool {
-    if sig_hex.len() != 64 { return false; }
+    if sig_hex.len() != 64 {
+        return false;
+    }
     type HmacSha = hmac::Hmac<sha2::Sha256>;
-    let mut mac  = HmacSha::new_from_slice(secret.as_bytes()).expect("key length");
+    let mut mac = HmacSha::new_from_slice(secret.as_bytes()).expect("key length");
     mac.update(body);
     let calc = mac.finalize().into_bytes();
     match hex::decode(sig_hex) {
         Ok(given) => calc.ct_eq(&given).into(),
-        Err(_)    => false,
+        Err(_) => false,
     }
 }

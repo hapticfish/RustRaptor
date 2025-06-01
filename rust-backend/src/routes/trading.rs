@@ -1,14 +1,14 @@
 // src/routes/trading.rs
 
-use actix_web::{post, get, web, HttpResponse, Responder, HttpMessage};
-use serde::Deserialize;
-use actix_web::dev::{HttpServiceFactory};
 use crate::config::settings::Settings;
-use crate::services::trading_engine::{execute_trade, Exchange, TradeRequest, TradeResponse};
-use crate::services::blowfin::api::get_balance;
-use crate::utils::types::ApiResponse;
-use serde_json::Value;
 use crate::middleware::path_logger::PathLogger;
+use crate::services::blowfin::api::get_balance;
+use crate::services::trading_engine::{execute_trade, Exchange, TradeRequest, TradeResponse};
+use crate::utils::types::ApiResponse;
+use actix_web::dev::HttpServiceFactory;
+use actix_web::{get, post, web, HttpMessage, HttpResponse, Responder};
+use serde::Deserialize;
+use serde_json::Value;
 
 #[derive(Debug, Deserialize)]
 pub struct TradeParams {
@@ -39,7 +39,9 @@ pub async fn trade(
     };
 
     // --- Extract user_id from JWT extension (auth middleware puts it there) ---
-    let user_id: i64 = req.extensions().get::<String>()
+    let user_id: i64 = req
+        .extensions()
+        .get::<String>()
         .and_then(|uid_str| uid_str.parse::<i64>().ok())
         .unwrap_or(0); // You may want to error if missing
 
@@ -59,13 +61,7 @@ pub async fn trade(
         size: params.size,
     };
 
-    match execute_trade(
-        req_struct,
-        db.as_ref(),
-        user_id,
-        is_demo,
-        master_key_bytes,
-    ).await {
+    match execute_trade(req_struct, db.as_ref(), user_id, is_demo, master_key_bytes).await {
         Ok(resp) => HttpResponse::Ok().json(ApiResponse::<TradeResponse> {
             success: true,
             message: Some("Trade executed successfully".to_string()),
@@ -85,7 +81,9 @@ pub async fn balance(
     db: web::Data<sqlx::PgPool>,
     req: actix_web::HttpRequest,
 ) -> impl Responder {
-    let user_id: i64 = req.extensions().get::<String>()
+    let user_id: i64 = req
+        .extensions()
+        .get::<String>()
         .and_then(|uid_str| uid_str.parse::<i64>().ok())
         .unwrap_or(0);
 
@@ -93,12 +91,7 @@ pub async fn balance(
     let master_key = std::env::var("MASTER_KEY").unwrap_or_default();
     let master_key_bytes = master_key.as_bytes();
 
-    match get_balance(
-        db.as_ref(),
-        user_id,
-        is_demo,
-        master_key_bytes,
-    ).await {
+    match get_balance(db.as_ref(), user_id, is_demo, master_key_bytes).await {
         Ok(resp) => HttpResponse::Ok().json(ApiResponse::<Value> {
             success: true,
             message: Some("Balance fetched successfully".to_string()),
@@ -119,24 +112,17 @@ pub async fn test_trade_api() -> impl Responder {
 
 #[get("/routes")]
 pub async fn list_routes() -> impl Responder {
-    let routes = vec![
-        "/health",
-        "/api/trade",
-        "/api/balance",
-        "/api/test",
-    ];
+    let routes = vec!["/health", "/api/trade", "/api/balance", "/api/test"];
 
     HttpResponse::Ok().json(routes)
 }
 
 #[get("/simple")]
 pub async fn simple_test() -> impl Responder {
-
     HttpResponse::Ok().body("Simple test route")
 }
 
 pub fn trading_scope() -> impl HttpServiceFactory {
-
     web::scope("/api")
         .wrap(PathLogger)
         .service(simple_test)

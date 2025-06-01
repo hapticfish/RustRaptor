@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO user_strategies\n              (user_id, exchange, symbol, strategy, params)\n        VALUES ($1      , $2      , $3    , $4      , $5)\n        RETURNING strategy_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "strategy_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ee12057a5429409a9034ba027cba9e6c3baa396691bb1287d2c8739791c474a0"
+}

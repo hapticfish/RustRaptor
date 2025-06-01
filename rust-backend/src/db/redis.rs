@@ -1,11 +1,8 @@
 //  src/db/redis.rs
 
-use std::{sync::Arc, time::Instant};
-use redis::{
-    aio::{ConnectionManager},
-    AsyncCommands, Client, RedisError, ToRedisArgs,
-};
+use redis::{aio::ConnectionManager, AsyncCommands, Client, RedisError, ToRedisArgs};
 use serde::{de::DeserializeOwned, Serialize};
+use std::{sync::Arc, time::Instant};
 
 /// Thin, cheap-to-clone handle.
 #[derive(Clone)]
@@ -17,7 +14,7 @@ impl RedisPool {
     /// Build once at start-up and share via `.data()` in Actix.
     pub async fn new(url: &str) -> Result<Self, RedisError> {
         let client = Client::open(url)?;
-        let manager    = client.get_connection_manager().await?;
+        let manager = client.get_connection_manager().await?;
         Ok(Self {
             manager: Arc::new(manager),
         })
@@ -27,14 +24,8 @@ impl RedisPool {
         self.manager.clone()
     }
 
-
     // ─── Helpers ──────────────────────────────────────────────────────────────
-    pub async fn set_json<K, T>(
-        &self,
-        key: K,
-        value: &T,
-        ttl_secs: usize,
-    ) -> Result<(), RedisError>
+    pub async fn set_json<K, T>(&self, key: K, value: &T, ttl_secs: usize) -> Result<(), RedisError>
     where
         K: ToRedisArgs + Send + Sync,
         T: Serialize,
@@ -45,7 +36,11 @@ impl RedisPool {
 
         let started = Instant::now();
         if ttl_secs == 0 {
-            redis::cmd("SET").arg(key).arg(payload).query_async::<_, ()>(&mut con).await?;
+            redis::cmd("SET")
+                .arg(key)
+                .arg(payload)
+                .query_async::<_, ()>(&mut con)
+                .await?;
         } else {
             redis::cmd("SET")
                 .arg(key)

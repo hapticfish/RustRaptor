@@ -1,10 +1,10 @@
 // src/services/blowfin/auth.rs
 
+use base64::{engine::general_purpose, Engine as _};
+use chrono::Utc;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
-use base64::{engine::general_purpose, Engine as _};
 use uuid::Uuid;
-use chrono::Utc;
 
 /// Millisecond timestamp
 pub fn current_timestamp() -> String {
@@ -33,11 +33,7 @@ pub fn sign_rest(
 }
 
 /// Sign WebSocket login operation
-pub fn sign_ws(
-    secret: &str,
-    timestamp: &str,
-    nonce: &str,
-) -> String {
+pub fn sign_ws(secret: &str, timestamp: &str, nonce: &str) -> String {
     let path = "/users/self/verify";
     let method = "GET";
     let prehash = format!("{}{}{}{}", path, method, timestamp, nonce);

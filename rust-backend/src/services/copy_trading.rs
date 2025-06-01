@@ -1,13 +1,12 @@
-
 //  src/services/copy_trading.rs
 
 // use std::{fmt, time::Duration};
 
+use crate::services::risk;
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
-use sqlx::{postgres::PgPool};
+use sqlx::postgres::PgPool;
 use uuid::Uuid;
-use crate::services::risk;
 
 use crate::{
     db::redis::RedisPool,
@@ -51,7 +50,6 @@ pub async fn add_follower(
     leader_id: i64,
     follower_id: i64,
 ) -> Result<(), CopyError> {
-
     sqlx::query!(
         r#"
         INSERT INTO copy_relations (leader_user_id, follower_user_id)
@@ -62,9 +60,8 @@ pub async fn add_follower(
         leader_id,
         follower_id
     )
-        .execute(pg)
-        .await?;
-
+    .execute(pg)
+    .await?;
 
     let key = redis.with_prefix("copy", leader_id.to_string());
     let mut conn = redis.manager().as_ref().clone();
@@ -91,8 +88,8 @@ pub async fn remove_follower(
         leader_id,
         follower_id
     )
-        .execute(pg)
-        .await?;
+    .execute(pg)
+    .await?;
 
     let key = redis.with_prefix("copy", leader_id.to_string());
     let mut conn = redis.manager().as_ref().clone();
@@ -123,9 +120,9 @@ pub async fn followers_for_leader(
            AND status = 'active'
         "#,
     )
-        .bind(leader_id)
-        .fetch_all(pg)
-        .await?;
+    .bind(leader_id)
+    .fetch_all(pg)
+    .await?;
 
     let followers: Vec<i64> = rows.into_iter().map(|r| r.0).collect();
     if !followers.is_empty() {
@@ -156,10 +153,9 @@ pub async fn replicate_to_followers(
     let is_demo = settings.is_demo();
 
     for fid in followers {
-
         if let Err(e) = risk::check_drawdown(redis, fid).await {
             log::warn!("follower {fid}: DD limit hit – skipping copy: {e}");
-            continue;                                     // just skip this follower
+            continue; // just skip this follower
         }
 
         // naïve 1-for-1 copy; in practice scale, slippage & balance checks apply
@@ -175,11 +171,13 @@ pub async fn replicate_to_followers(
         // Now, execute for the follower!
         if let Err(e) = execute_trade(
             req,
-            pg,          // Pass DB connection
-            fid,         // Follower's user ID
+            pg,  // Pass DB connection
+            fid, // Follower's user ID
             is_demo,
             master_key_bytes,
-        ).await {
+        )
+        .await
+        {
             log::warn!("copy trade for follower {} failed: {}", fid, e);
         }
     }

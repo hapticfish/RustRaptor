@@ -1,9 +1,9 @@
 // src/services/trading_engine.rs
 
-use crate::services::blowfin::api::{OrderRequest};
+use crate::services::blowfin::api::OrderRequest;
 use crate::services::risk;
 
-pub(crate) use crate::utils::errors::{TradeError};
+pub(crate) use crate::utils::errors::TradeError;
 use serde_json::Value;
 use sqlx::PgPool;
 
@@ -42,9 +42,7 @@ pub async fn execute_trade(
     is_demo: bool,
     master_key: &[u8],
 ) -> Result<TradeResponse, TradeError> {
-
     risk::check_slippage(0.0)?;
-
 
     match req.exchange {
         Exchange::Blowfin => {
@@ -58,14 +56,10 @@ pub async fn execute_trade(
             };
 
             let resp = crate::services::blowfin::api::place_order(
-                db,
-                user_id,
-                &order_req,
-                is_demo,
-                master_key
+                db, user_id, &order_req, is_demo, master_key,
             )
-                .await
-                .map_err(TradeError::Api)?;
+            .await
+            .map_err(TradeError::Api)?;
 
             Ok(TradeResponse {
                 success: resp.code == "0",

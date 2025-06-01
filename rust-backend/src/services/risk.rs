@@ -13,16 +13,13 @@ use redis::AsyncCommands;
 use sqlx::PgPool;
 use tokio::time::{interval, Duration};
 
-use crate::{
-    db::redis::RedisPool,
-    utils::errors::TradeError,
-};
+use crate::{db::redis::RedisPool, utils::errors::TradeError};
 
 /// ─── Constants ───────────────────────────────────────────────────────────
-const MAX_SLIPPAGE_BPS: f64 = 10.0;   // 0.10 %
-const MAX_DD_PCT:       f64 = 20.0;   // −20 % over look-back
-const LOOKBACK_SECS:    i64 = 86_400; // 24 h
-const REDIS_TTL:        usize = (LOOKBACK_SECS as usize) + 600; // keep a bit longer
+const MAX_SLIPPAGE_BPS: f64 = 10.0; // 0.10 %
+const MAX_DD_PCT: f64 = 20.0; // −20 % over look-back
+const LOOKBACK_SECS: i64 = 86_400; // 24 h
+const REDIS_TTL: usize = (LOOKBACK_SECS as usize) + 600; // keep a bit longer
 
 /// ─── Public helpers ──────────────────────────────────────────────────────
 /// Pre-trade slippage guard (caller passes their own estimate)
@@ -53,21 +50,19 @@ pub async fn record_fill(
 }
 
 /// Check the 24 h realised PnL window and error on breach
-pub async fn check_drawdown(
-    redis: &RedisPool,
-    user_id: i64,
-) -> Result<(), TradeError> {
-    let key     = redis.with_prefix("dd", user_id.to_string());
+pub async fn check_drawdown(redis: &RedisPool, user_id: i64) -> Result<(), TradeError> {
+    let key = redis.with_prefix("dd", user_id.to_string());
     let mut conn = redis.manager().as_ref().clone();
     let rows: Vec<String> = conn.lrange(&key, 0, -1).await.unwrap_or_default();
 
     let cutoff = Utc::now().timestamp() - LOOKBACK_SECS;
-    let dd: f64 = rows.into_iter()
+    let dd: f64 = rows
+        .into_iter()
         .filter_map(|s| {
             let mut it = s.split('|');
-            let ts  = it.next()?.parse::<i64>().ok()?;
+            let ts = it.next()?.parse::<i64>().ok()?;
             let pnl = it.next()?.parse::<f64>().ok()?;
-            (ts >= cutoff).then(|| pnl)
+            (ts >= cutoff).then_some(pnl)
         })
         .sum();
 
@@ -84,10 +79,7 @@ pub async fn check_drawdown(
 
 /// ─── Guardian loop ───────────────────────────────────────────────────────
 /// Runs in the background, polls the DB every minute, applies draw-down check
-pub fn spawn_guardian(
-    pg: PgPool,
-    redis: RedisPool,
-) {
+pub fn spawn_guardian(pg: PgPool, redis: RedisPool) {
     tokio::spawn(async move {
         let mut iv = interval(Duration::from_secs(60));
 
@@ -115,8 +107,8 @@ async fn active_users(pg: &PgPool) -> sqlx::Result<Vec<i64>> {
          WHERE status = 'enabled'
         "#
     }
-        .fetch_all(pg)
-        .await?;
+    .fetch_all(pg)
+    .await?;
 
     Ok(rows.into_iter().map(|r| r.user_id).collect())
 }

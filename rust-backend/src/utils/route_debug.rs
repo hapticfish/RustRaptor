@@ -1,9 +1,7 @@
-use actix_web::{web, HttpResponse, Responder, get};
-
+use actix_web::{get, web, HttpResponse, Responder};
 
 #[get("/debug/routes")]
 pub async fn dump_routes() -> impl Responder {
-
     let routes = vec![
         "GET /health",
         "GET /api/test",

@@ -1,8 +1,10 @@
 // tests/routes.rs
-use actix_web::{test, App, web, HttpResponse};
+use actix_web::{test, web, App, HttpResponse};
 use rustraptor_backend::routes::health::health_scope;
 // Import the individual handlers directly
-use rustraptor_backend::routes::trading::{simple_test, test_trade_api, balance, trade, list_routes};
+use rustraptor_backend::routes::trading::{
+    balance, list_routes, simple_test, test_trade_api, trade,
+};
 use rustraptor_backend::utils::route_debug::{dump_routes, param_test, request_info};
 
 #[actix_rt::test]
@@ -11,16 +13,16 @@ async fn test_all_routes_exist() {
 
     // Start with just API routes
     let app = test::init_service(
-        App::new()
-            .service(
-                web::scope("/api")
-                    .service(simple_test)
-                    .service(test_trade_api)
-                    .service(balance)
-                    .service(trade)
-                    .service(list_routes)
-            )
-    ).await;
+        App::new().service(
+            web::scope("/api")
+                .service(simple_test)
+                .service(test_trade_api)
+                .service(balance)
+                .service(trade)
+                .service(list_routes),
+        ),
+    )
+    .await;
 
     println!("API-only app initialized");
 
@@ -34,17 +36,16 @@ async fn test_all_routes_exist() {
     // Now add health scope and test again
     println!("Now testing with health_scope added");
     let app = test::init_service(
-        App::new()
-            .service(health_scope())
-            .service(
-                web::scope("/api")
-                    .service(simple_test)
-                    .service(test_trade_api)
-                    .service(balance)
-                    .service(trade)
-                    .service(list_routes)
-            )
-    ).await;
+        App::new().service(health_scope()).service(
+            web::scope("/api")
+                .service(simple_test)
+                .service(test_trade_api)
+                .service(balance)
+                .service(trade)
+                .service(list_routes),
+        ),
+    )
+    .await;
 
     println!("API+health app initialized");
 
@@ -65,12 +66,13 @@ async fn test_all_routes_exist() {
                     .service(test_trade_api)
                     .service(balance)
                     .service(trade)
-                    .service(list_routes)
+                    .service(list_routes),
             )
             .service(dump_routes)
             .service(request_info)
-            .service(param_test)
-    ).await;
+            .service(param_test),
+    )
+    .await;
 
     println!("API+health+debug app initialized");
 
@@ -93,8 +95,9 @@ async fn test_route_debug_implementation() {
         App::new()
             .service(dump_routes)
             .service(request_info)
-            .service(param_test)
-    ).await;
+            .service(param_test),
+    )
+    .await;
 
     // Test a few paths to see what's registered
     for path in ["/debug/routes", "/debug/param/42", "/api/test"] {
@@ -105,23 +108,26 @@ async fn test_route_debug_implementation() {
     }
 }
 
-
 #[actix_rt::test]
 async fn test_direct_registration() {
-    use rustraptor_backend::routes::trading::{simple_test, test_trade_api, balance, trade, list_routes};
+    use rustraptor_backend::routes::trading::{
+        balance, list_routes, simple_test, test_trade_api, trade,
+    };
 
     println!("Starting test_direct_registration");
 
     // Register routes directly without going through trading_scope()
     let app = test::init_service(
-        App::new()
-            .service(web::scope("/api")
+        App::new().service(
+            web::scope("/api")
                 .service(simple_test)
                 .service(test_trade_api)
                 .service(balance)
                 .service(trade)
-                .service(list_routes))
-    ).await;
+                .service(list_routes),
+        ),
+    )
+    .await;
 
     println!("Application with direct registration initialized");
 
@@ -142,21 +148,25 @@ async fn test_direct_registration() {
 // Keeping this additional test can be helpful for debugging
 #[actix_rt::test]
 async fn test_without_middleware() {
-    use rustraptor_backend::routes::trading::{simple_test, test_trade_api, balance, trade, list_routes};
+    use rustraptor_backend::routes::trading::{
+        balance, list_routes, simple_test, test_trade_api, trade,
+    };
 
     println!("Starting test_without_middleware");
 
     // Create a test app without using trading_scope() and without middleware
     let app = test::init_service(
-        App::new()
-            .service(web::scope("/api")
+        App::new().service(
+            web::scope("/api")
                 // No middleware here
                 .service(simple_test)
                 .service(test_trade_api)
                 .service(balance)
                 .service(trade)
-                .service(list_routes))
-    ).await;
+                .service(list_routes),
+        ),
+    )
+    .await;
 
     println!("Application without middleware initialized");
 
@@ -167,17 +177,13 @@ async fn test_without_middleware() {
     assert_eq!(resp.status(), 200);
 }
 
-
 #[actix_rt::test]
 async fn test_minimal_registration() {
     println!("Starting test_minimal_registration");
 
     // Only register the API routes, nothing else
-    let app = test::init_service(
-        App::new()
-            .service(web::scope("/api")
-                .service(test_trade_api))
-    ).await;
+    let app =
+        test::init_service(App::new().service(web::scope("/api").service(test_trade_api))).await;
 
     println!("Minimal app initialized");
 
@@ -188,22 +194,16 @@ async fn test_minimal_registration() {
     assert_eq!(resp.status(), 200);
 }
 
-
 #[actix_rt::test]
 async fn test_function_registration() {
-    use rustraptor_backend::routes::trading::test_trade_api;
-    use actix_web::dev::HttpServiceFactory;
-
     println!("Starting test_function_registration");
 
     // Register route using function reference
-    let app = test::init_service(
-        App::new()
-            .service(web::scope("/api")
-                .route("/test", web::get().to(|| async {
-                    HttpResponse::Ok().body("Test function")
-                })))
-    ).await;
+    let app = test::init_service(App::new().service(web::scope("/api").route(
+        "/test",
+        web::get().to(|| async { HttpResponse::Ok().body("Test function") }),
+    )))
+    .await;
 
     println!("Function registration app initialized");
 
@@ -214,7 +214,6 @@ async fn test_function_registration() {
     assert_eq!(resp.status(), 200);
 }
 
-
 #[actix_rt::test]
 async fn test_only_api_test_route() {
     use rustraptor_backend::routes::trading::test_trade_api;
@@ -222,11 +221,8 @@ async fn test_only_api_test_route() {
     println!("Starting test_only_api_test_route");
 
     // Register ONLY the /api/test route
-    let app = test::init_service(
-        App::new()
-            .service(web::scope("/api")
-                .service(test_trade_api))
-    ).await;
+    let app =
+        test::init_service(App::new().service(web::scope("/api").service(test_trade_api))).await;
 
     println!("Only /api/test app initialized");
 

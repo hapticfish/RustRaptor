@@ -7,6 +7,5 @@ async fn health_check() -> HttpResponse {
 }
 
 pub fn health_scope() -> Scope {
-    web::scope("/health")
-        .service(health_check)
+    web::scope("/health").service(health_check)
 }

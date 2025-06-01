@@ -1,9 +1,9 @@
-use std::future::{ready, Ready};
 use actix_web::{
     dev::{self, Service, ServiceRequest, ServiceResponse, Transform},
     Error,
 };
 use futures_util::future::LocalBoxFuture;
+use std::future::{ready, Ready};
 
 // Define path logging middleware
 pub struct PathLogger;

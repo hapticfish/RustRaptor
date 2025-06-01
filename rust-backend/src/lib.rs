@@ -4,13 +4,13 @@ pub mod middleware;
 pub mod routes {
     pub mod copy;
     pub mod health;
-    pub mod trading;
     pub mod strategies;
+    pub mod trading;
 }
 pub mod services {
+    pub mod market_data;
     pub mod scheduler;
     pub mod trading_engine;
-    pub mod market_data;
 
     pub mod risk;
 
@@ -26,4 +26,3 @@ pub mod services {
 }
 
 pub mod utils;
-

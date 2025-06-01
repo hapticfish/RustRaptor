@@ -1,8 +1,8 @@
+use crate::db::api_keys::ApiKey;
 use crate::utils::errors::ApiError;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::db::api_keys::{ApiKey};
 use sqlx::PgPool;
 
 #[derive(Debug, Serialize)]
@@ -21,6 +21,7 @@ pub struct OrderRequest {
 #[derive(Debug, Deserialize)]
 pub struct BlowFinResponse {
     pub code: String,
+    #[allow(dead_code)]
     pub msg: String,
     pub data: Value,
 }
@@ -42,11 +43,13 @@ pub async fn place_order(
     let url = format!("{}{}", base, path);
 
     // 1. Get user's API key from DB
-    let api_key_row = ApiKey::get_by_user_and_exchange(db, user_id, "blowfin").await?
+    let api_key_row = ApiKey::get_by_user_and_exchange(db, user_id, "blowfin")
+        .await?
         .ok_or_else(|| ApiError::Custom("Missing API key for BlowFin".into()))?;
 
     // 2. Decrypt API key
-    let creds = api_key_row.decrypt(master_key)
+    let creds = api_key_row
+        .decrypt(master_key)
         .map_err(|e| ApiError::Custom(format!("decrypt failed: {e}")))?;
 
     // 3. Sign the request with the decrypted secret
@@ -95,22 +98,18 @@ pub async fn get_balance(
     let url = format!("{}{}", base, path);
 
     // 1. Get and decrypt API key
-    let api_key_row = ApiKey::get_by_user_and_exchange(db, user_id, "blowfin").await?
+    let api_key_row = ApiKey::get_by_user_and_exchange(db, user_id, "blowfin")
+        .await?
         .ok_or_else(|| ApiError::Custom("Missing API key for BlowFin".into()))?;
-    let creds = api_key_row.decrypt(master_key)
+    let creds = api_key_row
+        .decrypt(master_key)
         .map_err(|e| ApiError::Custom(format!("decrypt failed: {e}")))?;
 
     // 2. Sign
     let ts = crate::services::blowfin::auth::current_timestamp();
     let nonce = crate::services::blowfin::auth::generate_nonce();
-    let sign = crate::services::blowfin::auth::sign_rest(
-        &creds.api_secret,
-        "GET",
-        path,
-        &ts,
-        &nonce,
-        "",
-    );
+    let sign =
+        crate::services::blowfin::auth::sign_rest(&creds.api_secret, "GET", path, &ts, &nonce, "");
 
     let client = Client::new();
     let resp = client

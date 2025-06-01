@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE copy_relations\n           SET status = 'ended', until = now()\n         WHERE leader_user_id = $1\n           AND follower_user_id = $2\n           AND status = 'active'\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "59b576bb621656be6d248e583ffa224f96037829df9c18860214f3d0b5e664f5"
+}

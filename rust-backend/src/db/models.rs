@@ -1,9 +1,9 @@
+use crate::utils::types::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use sqlx::{FromRow};
 use sqlx::types::BigDecimal;
-use crate::utils::types::*;
+use sqlx::FromRow;
+use uuid::Uuid;
 
 /* -------------------------- USERS -------------------------- */
 
@@ -171,12 +171,14 @@ pub struct AuditLog {
 
 /* -------------------------- User Strategies ---------------------- */
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserStrategy {
     pub strategy_id: Uuid,
     pub user_id: i64,
-    pub name: String,
+    pub exchange: String,
+    pub symbol: String,
+    pub strategy: String,
     pub params: serde_json::Value,
     pub status: String,
-    pub created_at: Option<DateTime<Utc>>,
+    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
 }

@@ -1,12 +1,12 @@
-use sqlx::{PgPool, Result};
-use uuid::Uuid;
 use crate::{
     db::models::*,
     utils::types::{FeeType, MakerTaker, MarketType, OrderStatus, OrderType},
 };
+use sqlx::{PgPool, Result};
+use uuid::Uuid;
 
 /* -----------------------  USERS  ----------------------- */
-
+#[allow(dead_code)]
 pub async fn get_user_by_id(pool: &PgPool, user_id: i64) -> Result<Option<User>> {
     sqlx::query_as!(
         User,
@@ -17,12 +17,12 @@ pub async fn get_user_by_id(pool: &PgPool, user_id: i64) -> Result<Option<User>>
         "#,
         user_id
     )
-        .fetch_optional(pool)
-        .await
+    .fetch_optional(pool)
+    .await
 }
 
 /* ---------------------- API KEYS ----------------------- */
-
+#[allow(dead_code)]
 pub async fn get_api_keys_for_user(pool: &PgPool, user_id: i64) -> Result<Vec<ApiKey>> {
     sqlx::query_as!(
         ApiKey,
@@ -35,29 +35,36 @@ pub async fn get_api_keys_for_user(pool: &PgPool, user_id: i64) -> Result<Vec<Ap
         "#,
         user_id
     )
-        .fetch_all(pool)
-        .await
+    .fetch_all(pool)
+    .await
 }
 
 /* --------------------- STRATEGIES ---------------------- */
-
+#[allow(dead_code)]
 pub async fn get_active_strategies(pool: &PgPool, user_id: i64) -> Result<Vec<UserStrategy>> {
     sqlx::query_as!(
         UserStrategy,
         r#"
-        SELECT strategy_id, user_id, name, params, status, created_at
+        SELECT strategy_id,
+               user_id,
+               exchange,
+               symbol,
+               strategy,
+               params,
+               status,
+               created_at
         FROM   user_strategies
         WHERE  user_id = $1
-        AND    status  = 'enabled'
+          AND  status  = 'enabled'
         "#,
         user_id
     )
-        .fetch_all(pool)
-        .await
+    .fetch_all(pool)
+    .await
 }
 
 /* ───────── ORDERS ──────── */
-
+#[allow(dead_code)]
 pub async fn get_orders_by_user(pool: &PgPool, user_id: i64) -> Result<Vec<Order>> {
     sqlx::query_as!(
         Order,
@@ -84,12 +91,12 @@ pub async fn get_orders_by_user(pool: &PgPool, user_id: i64) -> Result<Vec<Order
         "#,
         user_id
     )
-        .fetch_all(pool)
-        .await
+    .fetch_all(pool)
+    .await
 }
 
 /* ───────── FILLS ───────── */
-
+#[allow(dead_code)]
 pub async fn get_fills_for_order(pool: &PgPool, order_id: Uuid) -> Result<Vec<Fill>> {
     sqlx::query_as!(
         Fill,
@@ -109,12 +116,12 @@ pub async fn get_fills_for_order(pool: &PgPool, order_id: Uuid) -> Result<Vec<Fi
         "#,
         order_id
     )
-        .fetch_all(pool)
-        .await
+    .fetch_all(pool)
+    .await
 }
 
 /* ───────── FEES ────────── */
-
+#[allow(dead_code)]
 pub async fn get_fees_for_user(pool: &PgPool, user_id: i64) -> Result<Vec<Fee>> {
     sqlx::query_as!(
         Fee,
@@ -133,13 +140,12 @@ pub async fn get_fees_for_user(pool: &PgPool, user_id: i64) -> Result<Vec<Fee>> 
         "#,
         user_id
     )
-        .fetch_all(pool)
-        .await
+    .fetch_all(pool)
+    .await
 }
 
-
 /* ─────── POSITIONS ─────── */
-
+#[allow(dead_code)]
 pub async fn get_latest_positions(pool: &PgPool, user_id: i64) -> Result<Vec<Position>> {
     sqlx::query_as!(
         Position,
@@ -163,12 +169,12 @@ pub async fn get_latest_positions(pool: &PgPool, user_id: i64) -> Result<Vec<Pos
         "#,
         user_id
     )
-        .fetch_all(pool)
-        .await
+    .fetch_all(pool)
+    .await
 }
 
 /* ─────── BALANCES ──────── */
-
+#[allow(dead_code)]
 pub async fn get_latest_balances(pool: &PgPool, user_id: i64) -> Result<Vec<Balance>> {
     sqlx::query_as!(
         Balance,
@@ -187,12 +193,12 @@ pub async fn get_latest_balances(pool: &PgPool, user_id: i64) -> Result<Vec<Bala
         "#,
         user_id
     )
-        .fetch_all(pool)
-        .await
+    .fetch_all(pool)
+    .await
 }
 
 /* -------------------- COPY RELATIONS ------------------- */
-
+#[allow(dead_code)]
 pub async fn get_copy_followers(pool: &PgPool, leader_id: i64) -> Result<Vec<CopyRelation>> {
     sqlx::query_as!(
         CopyRelation,
@@ -209,6 +215,6 @@ pub async fn get_copy_followers(pool: &PgPool, leader_id: i64) -> Result<Vec<Cop
         "#,
         leader_id
     )
-        .fetch_all(pool)
-        .await
+    .fetch_all(pool)
+    .await
 }

@@ -1,12 +1,10 @@
 // src/routes/strategies.rs
-use actix_web::{delete, get, post, web, HttpResponse, Responder, Scope, HttpRequest, HttpMessage};
-// use actix_web::dev::HttpServiceFactory;
-use crate::db::models::UserStrategy;
+use actix_web::{delete, get, post, web, HttpMessage, HttpRequest, HttpResponse, Responder, Scope};
 use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::utils::types::ApiResponse;
 
+use crate::{db::models::UserStrategy, utils::types::ApiResponse};
 
 fn user_id(req: &HttpRequest) -> Result<i64, HttpResponse> {
     req.extensions()
@@ -15,104 +13,77 @@ fn user_id(req: &HttpRequest) -> Result<i64, HttpResponse> {
         .ok_or_else(|| HttpResponse::Unauthorized().json(ApiResponse::<()>::err("no user id")))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct StartReq {
-    /// “BTCUSDT”
-    symbol: String,
-    /// Optional override, e.g. { "period": 30, "sigma": 1.8 }
-    params: serde_json::Value,
+    pub exchange: String,
+    /// Trading pair, e.g., "BTCUSDT"
+    pub symbol: String,
+    /// Name of the strategy ("mean_reversion", "trend_follow", etc)
+    pub strategy: String,
+    /// Params for the strategy (periods, thresholds, etc)
+    pub params: serde_json::Value,
 }
 
-#[post("/mean_reversion")]
-async fn start_mean_rev(
+const ALLOWED_FREE_STRATS: &[&str] = &["mean_reversion", "trend_follow", "vcsr"];
+
+/// Generic “launch strategy” endpoint
+#[post("")]
+async fn start_strategy(
     req: HttpRequest,
     db: web::Data<PgPool>,
-    body: web::Json<serde_json::Value>,
+    body: web::Json<StartReq>,
 ) -> impl Responder {
     let uid = match user_id(&req) {
         Ok(v) => v,
         Err(e) => return e,
     };
 
+    // ─── Tier / plan check ────────────────────────────────────────────────
+    // In v1 we assume every user is on the free plan.
+    let is_free = true;
+    if is_free && !ALLOWED_FREE_STRATS.contains(&body.strategy.as_str()) {
+        return HttpResponse::Forbidden().json(ApiResponse::<()>::err(
+            "upgrade required for custom strategies",
+        ));
+    }
+
+    // ─── Insert row ───────────────────────────────────────────────────────
     let row = sqlx::query!(
-        r#"INSERT INTO user_strategies (user_id, name, params)
-           VALUES ($1, 'mean_reversion', $2)
-           RETURNING strategy_id"#,
+        r#"
+        INSERT INTO user_strategies
+              (user_id, exchange, symbol, strategy, params)
+        VALUES ($1      , $2      , $3    , $4      , $5)
+        RETURNING strategy_id
+        "#,
         uid,
-        body.0
+        body.exchange,
+        body.symbol,
+        body.strategy,
+        body.params
     )
-        .fetch_one(db.as_ref())
-        .await;
+    .fetch_one(db.as_ref())
+    .await;
 
     match row {
         Ok(r) => HttpResponse::Ok().json(ApiResponse::ok(r.strategy_id)),
         Err(e) => {
-            log::error!("DB error: {e}");
+            log::error!("start_strategy: DB error: {e}");
             HttpResponse::InternalServerError().json(ApiResponse::<()>::err("db error"))
         }
     }
 }
 
-
-#[post("/trend_follow")]
-async fn start_trend_follow(
-    req:  HttpRequest,
-    db: web::Data<PgPool>,
-    body: web::Json<serde_json::Value>,
-) -> impl Responder {
-    let uid = match user_id(&req) { Ok(v) => v, Err(e) => return e };
-
-    let row = sqlx::query!(
-        r#"INSERT INTO user_strategies (user_id, name, params)
-           VALUES ($1,'trend_follow',$2) RETURNING strategy_id"#,
-        uid,
-        body.0
-    )
-        .fetch_one(db.as_ref())
-        .await;
-
-    match row {
-        Ok(r) => HttpResponse::Ok().json(ApiResponse::ok(r.strategy_id)),
-        Err(e)=> { log::error!("DB error: {e}");
-            HttpResponse::InternalServerError()
-                .json(ApiResponse::<()>::err("db error")) }
-    }
-}
-
-#[post("/vcsr")]
-async fn start_vcsr(
-    req:  HttpRequest,
-    db:  web::Data<PgPool>,
-    body: web::Json<serde_json::Value>,
-) -> impl Responder {
-    let uid = match user_id(&req) { Ok(v) => v, Err(e) => return e };
-
-    let row = sqlx::query!(
-        r#"INSERT INTO user_strategies (user_id, name, params)
-           VALUES ($1, 'vcsr', $2) RETURNING strategy_id"#,
-        uid,
-        body.0
-    )
-        .fetch_one(db.as_ref())
-        .await;
-
-    match row {
-        Ok(r) => HttpResponse::Ok().json(ApiResponse::ok(r.strategy_id)),
-        Err(e) => {
-            log::error!("DB error: {e}");
-            HttpResponse::InternalServerError().json(ApiResponse::<()>::err("db error"))
-        }
-    }
-}
-
+/// DELETE /api/strategies/{id}
 #[delete("/{id}")]
 async fn stop_strategy(
-    req:  HttpRequest,
+    req: HttpRequest,
     db: web::Data<PgPool>,
     path: web::Path<Uuid>,
 ) -> impl Responder {
-    let uid = match user_id(&req) { Ok(v) => v, Err(e) => return e };
-    let id  = *path;
+    let uid = match user_id(&req) {
+        Ok(v) => v,
+        Err(e) => return e,
+    };
 
     let result = sqlx::query!(
         r#"
@@ -121,54 +92,60 @@ async fn stop_strategy(
          WHERE strategy_id = $1
            AND user_id     = $2
         "#,
-        id,
+        *path,
         uid
     )
-        .execute(db.as_ref())
-        .await;
+    .execute(db.as_ref())
+    .await;
 
     match result {
         Ok(_) => HttpResponse::Ok().json(ApiResponse::<()>::ok(())),
         Err(e) => {
-            log::error!("stop strategy db error: {e}");
+            log::error!("stop_strategy: DB error: {e}");
             HttpResponse::InternalServerError().json(ApiResponse::<()>::err("db error"))
         }
     }
 }
 
+/// GET /api/strategies/active
 #[get("/active")]
-async fn list_active(
-    req: HttpRequest,
-    db: web::Data<PgPool>,
-) -> impl Responder {
-    let uid = match user_id(&req) { Ok(v) => v, Err(e) => return e };
+async fn list_active(req: HttpRequest, db: web::Data<PgPool>) -> impl Responder {
+    let uid = match user_id(&req) {
+        Ok(v) => v,
+        Err(e) => return e,
+    };
 
     let rows = sqlx::query_as!(
         UserStrategy,
-        r#"SELECT strategy_id, user_id, name, params, status, created_at
-            FROM user_strategies
-            WHERE user_id = $1
-              AND status  = 'enabled'
+        r#"
+        SELECT strategy_id,
+               user_id,
+               exchange,
+               symbol,
+               strategy,
+               params,
+               status,
+               created_at
+        FROM   user_strategies
+        WHERE  user_id = $1
+          AND  status  = 'enabled'
         "#,
         uid
     )
-        .fetch_all(db.as_ref())
-        .await;
+    .fetch_all(db.as_ref())
+    .await;
 
     match rows {
         Ok(r) => HttpResponse::Ok().json(ApiResponse::ok(r)),
         Err(e) => {
-            log::error!("list active db error: {e}");
+            log::error!("list_active: DB error: {e}");
             HttpResponse::InternalServerError().json(ApiResponse::<()>::err("db error"))
         }
     }
 }
-
 pub fn strategy_scope() -> Scope {
     web::scope("/api/strategies")
-        .service(start_mean_rev)
-        .service(start_trend_follow)
-        .service(start_vcsr)
+        .service(start_strategy)
         .service(stop_strategy)
         .service(list_active)
 }

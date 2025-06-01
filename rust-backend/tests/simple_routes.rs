@@ -1,4 +1,4 @@
-use actix_web::{test, web, App, HttpResponse, Responder, get};
+use actix_web::{get, test, web, App, HttpResponse, Responder};
 
 // Define a very simple handler inline
 #[get("/hello")]
@@ -9,11 +9,7 @@ async fn hello() -> impl Responder {
 #[actix_rt::test]
 async fn test_basic_routing() {
     // Very simple test with a single scope and handler
-    let app = test::init_service(
-        App::new()
-            .service(web::scope("/test")
-                .service(hello))
-    ).await;
+    let app = test::init_service(App::new().service(web::scope("/test").service(hello))).await;
 
     // Test the route
     let req = test::TestRequest::get().uri("/test/hello").to_request();

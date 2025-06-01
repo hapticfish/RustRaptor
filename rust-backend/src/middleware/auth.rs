@@ -6,8 +6,8 @@ use futures_util::future::{ok, LocalBoxFuture, Ready};
 use futures_util::FutureExt;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::Deserialize;
-use std::rc::Rc;
 use std::marker::PhantomData;
+use std::rc::Rc;
 
 use crate::utils::signature::verify_hmac;
 
@@ -24,11 +24,11 @@ where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     B: 'static,
 {
-    type Response  = ServiceResponse<B>;
-    type Error     = Error;
+    type Response = ServiceResponse<B>;
+    type Error = Error;
     type InitError = ();
     type Transform = AuthMw<S, B>;
-    type Future    = Ready<Result<Self::Transform, Self::InitError>>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, srv: S) -> Self::Future {
         ok(AuthMw {
@@ -49,8 +49,8 @@ where
     B: 'static,
 {
     type Response = ServiceResponse<B>;
-    type Error    = Error;
-    type Future   = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Error = Error;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(
         &self,

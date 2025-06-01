@@ -1,8 +1,8 @@
 // src/db/api_keys.rs
 
-use sqlx::{PgPool};
-use uuid::Uuid;
 pub(crate) use crate::db::models::ApiKey;
+use sqlx::PgPool;
+use uuid::Uuid;
 
 /// **Optional**: Public struct to use when returning decrypted data
 #[derive(Debug, Clone)]
@@ -21,16 +21,15 @@ impl ApiKey {
     ) -> sqlx::Result<Option<ApiKey>> {
         sqlx::query_as::<_, ApiKey>(
             r#"SELECT * FROM api_keys
-               WHERE user_id = $1 AND exchange = $2"#
+               WHERE user_id = $1 AND exchange = $2"#,
         )
-            .bind(user_id)
-            .bind(exchange)
-            .fetch_optional(db)
-            .await
+        .bind(user_id)
+        .bind(exchange)
+        .fetch_optional(db)
+        .await
     }
 
-
-
+    #[allow(dead_code)]
     /// Insert new API key record (returns generated UUID).
     pub async fn insert(
         db: &PgPool,
@@ -55,16 +54,22 @@ impl ApiKey {
             secret,
             passphrase
         )
-            .fetch_one(db)
-            .await?;
+        .fetch_one(db)
+        .await?;
 
         Ok(rec.key_id)
-    }pub fn decrypt(&self, _master_key: &[u8]) -> Result<DecryptedApiKey, Box<dyn std::error::Error>> {
+    }
+    pub fn decrypt(
+        &self,
+        _master_key: &[u8],
+    ) -> Result<DecryptedApiKey, Box<dyn std::error::Error>> {
         // Stub: replace with real crypto logic (AES256, etc.)
         Ok(DecryptedApiKey {
-            api_key: String::from_utf8(self.encrypted_api_key.clone())?,      // Real code: decrypt bytes
+            api_key: String::from_utf8(self.encrypted_api_key.clone())?, // Real code: decrypt bytes
             api_secret: String::from_utf8(self.encrypted_secret.clone())?,
-            api_passphrase: self.encrypted_passphrase.as_ref()
+            api_passphrase: self
+                .encrypted_passphrase
+                .as_ref()
                 .map(|b| String::from_utf8(b.clone()))
                 .transpose()?
                 .unwrap_or_default(),

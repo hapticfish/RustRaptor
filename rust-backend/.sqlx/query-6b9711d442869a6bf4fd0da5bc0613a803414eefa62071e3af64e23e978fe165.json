@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT strategy_id,\n               user_id,\n               exchange,\n               symbol,\n               strategy,\n               params\n        FROM   user_strategies\n        WHERE  status = 'enabled'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "strategy_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "exchange",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "symbol",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "strategy",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "params",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6b9711d442869a6bf4fd0da5bc0613a803414eefa62071e3af64e23e978fe165"
+}

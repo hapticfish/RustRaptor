@@ -23,13 +23,17 @@ impl Settings {
             .map_err(|_| "SERVER_PORT must be a valid u16")?;
 
         let blowfin_api_key = env::var("BLOFIN_API_KEY").map_err(|_| "BLOFIN_API_KEY missing")?;
-        let blowfin_api_secret = env::var("BLOFIN_API_SECRET").map_err(|_| "BLOFIN_API_SECRET missing")?;
-        let blowfin_api_passphrase = env::var("BLOFIN_API_PASSPHRASE").map_err(|_| "BLOFIN_API_PASSPHRASE missing")?;
-        let app_mode = env::var("APP_MODE").map_err(|_| "APP_MODE missing")?.to_lowercase();
-        let default_strategy = env::var("DEFAULT_STRATEGY").map_err(|_| "DEFAULT_STRATEGY missing")?;
+        let blowfin_api_secret =
+            env::var("BLOFIN_API_SECRET").map_err(|_| "BLOFIN_API_SECRET missing")?;
+        let blowfin_api_passphrase =
+            env::var("BLOFIN_API_PASSPHRASE").map_err(|_| "BLOFIN_API_PASSPHRASE missing")?;
+        let app_mode = env::var("APP_MODE")
+            .map_err(|_| "APP_MODE missing")?
+            .to_lowercase();
+        let default_strategy =
+            env::var("DEFAULT_STRATEGY").map_err(|_| "DEFAULT_STRATEGY missing")?;
         let database_url = env::var("DATABASE_URL").map_err(|_| "DATABASE_URL missing")?;
-        let redis_url = env::var("REDIS_URL")
-            .unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
+        let redis_url = env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
 
         Ok(Self {
             server_port,

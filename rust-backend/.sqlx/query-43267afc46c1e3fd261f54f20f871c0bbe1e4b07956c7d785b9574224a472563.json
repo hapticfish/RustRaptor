@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE user_strategies\n           SET status = 'disabled'\n         WHERE strategy_id = $1\n           AND user_id     = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "43267afc46c1e3fd261f54f20f871c0bbe1e4b07956c7d785b9574224a472563"
+}
