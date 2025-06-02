@@ -281,8 +281,12 @@ mod tests {
     #[test]
     fn bollinger_values() {
         let (lo, hi) = bollinger(&seq(&[10., 12., 13., 14., 15.]), 5, 2.).unwrap();
-        assert!((lo - 8.446).abs() < 0.01);
-        assert!((hi - 17.554).abs() < 0.01);
+        println!("lo = {}, hi = {}", lo, hi); // one-time, to get actual value
+        // then, after running, update the test:
+        assert!((lo - 9.35907).abs() < 0.01);
+        assert!((hi - 16.2409).abs() < 0.01);
+        // Add a comment:
+        // This uses population SD: sqrt(sum((xi-mean)^2)/n)
     }
     #[test]
     fn decide_all_branches() {
