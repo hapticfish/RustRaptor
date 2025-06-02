@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use crate::{
     config::settings::Settings,
     db::redis::RedisPool,
@@ -7,6 +6,7 @@ use crate::{
 use dashmap::DashMap;
 use futures::future::{abortable, AbortHandle};
 use sqlx::PgPool;
+use std::sync::Arc;
 use uuid::Uuid;
 
 type TaskMap = DashMap<Uuid, AbortHandle>;
@@ -68,18 +68,36 @@ pub async fn reconcile(
             match r.strategy.as_str() {
                 "mean_reversion" => {
                     strategies::mean_reversion::loop_forever(
-                        r, rd, Arc::new(db), bus_clone, master_key, is_demo,
+                        r,
+                        rd,
+                        Arc::new(db),
+                        bus_clone,
+                        master_key,
+                        is_demo,
                     )
                     .await
                 }
                 "trend_follow" => {
                     strategies::trend_follow::loop_forever(
-                        r, rd, Arc::new(db), bus_clone, master_key, is_demo,
+                        r,
+                        rd,
+                        Arc::new(db),
+                        bus_clone,
+                        master_key,
+                        is_demo,
                     )
                     .await
                 }
                 "vcsr" => {
-                    strategies::vcsr::loop_forever(r, rd, Arc::new(db), bus_clone, master_key, is_demo).await
+                    strategies::vcsr::loop_forever(
+                        r,
+                        rd,
+                        Arc::new(db),
+                        bus_clone,
+                        master_key,
+                        is_demo,
+                    )
+                    .await
                 }
                 other => log::warn!("scheduler: unknown strategy '{other}'"),
             }

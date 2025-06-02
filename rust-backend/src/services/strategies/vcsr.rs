@@ -21,7 +21,6 @@
 //! 3. Provide adapters from your exchange client → [`MarketSnapshot`].
 //! 4. Enable the `robust` cargo feature to compile the back‑test harness.
 
-use std::sync::Arc;
 use crate::db::redis::RedisPool;
 use crate::services::market_data::MarketBus;
 use crate::services::strategies::{Candle, OrderBookSnapshot};
@@ -30,6 +29,7 @@ use chrono::{DateTime, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use statrs::statistics::{Data as StatsData, Distribution};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct VcsrConfig {

@@ -1,9 +1,9 @@
 //! Medium-Term Trend-Following (fast/slow SMA × Donchian breakout)
 
-use std::sync::Arc;
 use chrono::Timelike;
 use serde::Deserialize;
 use sqlx::PgPool;
+use std::sync::Arc;
 
 use crate::{
     db::redis::RedisPool,

@@ -16,9 +16,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tokio::sync::broadcast;
 
-
-type TradeExec = dyn Fn(TradeRequest, &(dyn Db), i64, bool, &[u8]) -> Result<(), String> + Send + Sync;
-
+type TradeExec =
+    dyn Fn(TradeRequest, &(dyn Db), i64, bool, &[u8]) -> Result<(), String> + Send + Sync;
 
 /// -------------------------------------------------------------------------
 /// Small async traits so we can inject mocks in unit tests
@@ -136,7 +135,7 @@ fn decide(candles: &[Candle], cfg: &MeanRevParams) -> Sig {
 pub async fn loop_forever(
     row: crate::services::scheduler::StrategyRow,
     redis: RedisPool,
-    db: Arc<PgPool>,        // <-- change here
+    db: Arc<PgPool>, // <-- change here
     bus: MarketBus,
     master_key: Vec<u8>,
     is_demo: bool,
@@ -149,7 +148,7 @@ pub async fn loop_forever(
     loop_forever_core(
         row,
         &redis,
-        &*db,  // Pass reference to Arc target for trait param
+        &*db, // Pass reference to Arc target for trait param
         Box::new(rx),
         &master_key,
         is_demo,
@@ -160,7 +159,7 @@ pub async fn loop_forever(
                 .map_err(|e| e.to_string())
         },
     )
-        .await;
+    .await;
 }
 
 /// -------------------------------------------------------------------------
@@ -177,8 +176,7 @@ pub async fn loop_forever_core(
     risk: &dyn RiskChecker,
     trade_exec: &TradeExec,
 ) {
-    let cfg: MeanRevParams = serde_json::from_value(row.params)
-        .expect("bad mean-reversion params");
+    let cfg: MeanRevParams = serde_json::from_value(row.params).expect("bad mean-reversion params");
 
     let mut hist: Vec<Candle> = Vec::with_capacity(200);
     let user_id = row.user_id;
@@ -195,12 +193,16 @@ pub async fn loop_forever_core(
         match decide(&hist, &cfg) {
             Sig::Hold => {}
             Sig::Buy => {
-                trade_core("buy", &cfg, redis, db, user_id, is_demo, master_key, risk, trade_exec)
-                    .await
+                trade_core(
+                    "buy", &cfg, redis, db, user_id, is_demo, master_key, risk, trade_exec,
+                )
+                .await
             }
             Sig::Sell => {
-                trade_core("sell", &cfg, redis, db, user_id, is_demo, master_key, risk, trade_exec)
-                    .await
+                trade_core(
+                    "sell", &cfg, redis, db, user_id, is_demo, master_key, risk, trade_exec,
+                )
+                .await
             }
         }
 
@@ -264,7 +266,10 @@ mod tests {
     fn seq(prices: &[f64]) -> Vec<Candle> {
         prices
             .iter()
-            .map(|&p| Candle { close: p, ..Default::default() })
+            .map(|&p| Candle {
+                close: p,
+                ..Default::default()
+            })
             .collect()
     }
 
@@ -283,7 +288,12 @@ mod tests {
     fn decide_all_branches() {
         let mut v = vec![10.0; 19];
         v.push(5.0);
-        let cfg = MeanRevParams { symbol: "BTCUSDT".into(), period: 20, sigma: 2.0, qty: 0.1 };
+        let cfg = MeanRevParams {
+            symbol: "BTCUSDT".into(),
+            period: 20,
+            sigma: 2.0,
+            qty: 0.1,
+        };
         assert_eq!(decide(&seq(&v), &cfg), Sig::Buy);
 
         let mut v = vec![10.0; 19];
@@ -305,75 +315,150 @@ mod tests {
     #[async_trait]
     impl Redis for RMock {
         async fn set_json(&self, _k: &str, _v: &[Candle], _e: usize) -> Result<(), ()> {
-            *self.cnt.lock().unwrap() += 1; Ok(())
+            *self.cnt.lock().unwrap() += 1;
+            Ok(())
         }
     }
     #[derive(Default)]
     struct DMock;
-    #[async_trait] impl Db for DMock {}
+    #[async_trait]
+    impl Db for DMock {}
 
-    struct RxMock { candles: Vec<Candle>, idx: usize }
+    struct RxMock {
+        candles: Vec<Candle>,
+        idx: usize,
+    }
     #[async_trait]
     impl MarketBusSub for RxMock {
         async fn recv(&mut self) -> Result<Candle, ()> {
             if self.idx < self.candles.len() {
-                let c = self.candles[self.idx]; self.idx += 1; Ok(c)
-            } else { Err(()) }
+                let c = self.candles[self.idx];
+                self.idx += 1;
+                Ok(c)
+            } else {
+                Err(())
+            }
         }
     }
 
-    struct RiskMock { fail: bool }
+    struct RiskMock {
+        fail: bool,
+    }
     impl RiskChecker for RiskMock {
         fn check_drawdown(&self, _: i64) -> Result<(), String> {
-            if self.fail { Err("dd".into()) } else { Ok(()) }
+            if self.fail {
+                Err("dd".into())
+            } else {
+                Ok(())
+            }
         }
     }
-    fn exec_mock(fail: bool)
-                 -> impl Fn(TradeRequest, &(dyn Db), i64, bool, &[u8]) -> Result<(), String> + Send + Sync {
+    fn exec_mock(
+        fail: bool,
+    ) -> impl Fn(TradeRequest, &(dyn Db), i64, bool, &[u8]) -> Result<(), String> + Send + Sync
+    {
         move |_, _, _, _, _| if fail { Err("boom".into()) } else { Ok(()) }
     }
 
     // ----------------------------------- trade_core branches -------------
-    #[tokio::test] async fn trade_dd_abort() {
-        trade_core("buy",
-                   &MeanRevParams { symbol:"BTCUSDT".into(), period:20, sigma:2.0, qty:0.01 },
-                   &RMock::default(), &DMock, 1, false, &[],
-                   &RiskMock{fail:true}, &exec_mock(false)
-        ).await;
+    #[tokio::test]
+    async fn trade_dd_abort() {
+        trade_core(
+            "buy",
+            &MeanRevParams {
+                symbol: "BTCUSDT".into(),
+                period: 20,
+                sigma: 2.0,
+                qty: 0.01,
+            },
+            &RMock::default(),
+            &DMock,
+            1,
+            false,
+            &[],
+            &RiskMock { fail: true },
+            &exec_mock(false),
+        )
+        .await;
     }
-    #[tokio::test] async fn trade_exec_err() {
-        trade_core("sell",
-                   &MeanRevParams { symbol:"BTCUSDT".into(), period:20, sigma:2.0, qty:0.01 },
-                   &RMock::default(), &DMock, 1, false, &[],
-                   &RiskMock{fail:false}, &exec_mock(true)
-        ).await;
+    #[tokio::test]
+    async fn trade_exec_err() {
+        trade_core(
+            "sell",
+            &MeanRevParams {
+                symbol: "BTCUSDT".into(),
+                period: 20,
+                sigma: 2.0,
+                qty: 0.01,
+            },
+            &RMock::default(),
+            &DMock,
+            1,
+            false,
+            &[],
+            &RiskMock { fail: false },
+            &exec_mock(true),
+        )
+        .await;
     }
-    #[tokio::test] async fn trade_happy() {
-        trade_core("sell",
-                   &MeanRevParams { symbol:"BTCUSDT".into(), period:20, sigma:2.0, qty:0.01 },
-                   &RMock::default(), &DMock, 1, false, &[],
-                   &RiskMock{fail:false}, &exec_mock(false)
-        ).await;
+    #[tokio::test]
+    async fn trade_happy() {
+        trade_core(
+            "sell",
+            &MeanRevParams {
+                symbol: "BTCUSDT".into(),
+                period: 20,
+                sigma: 2.0,
+                qty: 0.01,
+            },
+            &RMock::default(),
+            &DMock,
+            1,
+            false,
+            &[],
+            &RiskMock { fail: false },
+            &exec_mock(false),
+        )
+        .await;
     }
 
     // ----------------------------------- loop_core happy/branches --------
-    #[tokio::test] async fn loop_branches() {
-        let mut c = vec![Candle { close:10.0, ..Default::default() }; 19];
-        c.push(Candle { close:5.0, ..Default::default() });  // Buy
-        c.push(Candle { close:20.0, ..Default::default() }); // Sell
+    #[tokio::test]
+    async fn loop_branches() {
+        let mut c = vec![
+            Candle {
+                close: 10.0,
+                ..Default::default()
+            };
+            19
+        ];
+        c.push(Candle {
+            close: 5.0,
+            ..Default::default()
+        }); // Buy
+        c.push(Candle {
+            close: 20.0,
+            ..Default::default()
+        }); // Sell
 
         let row = crate::services::scheduler::StrategyRow {
             user_id: 42,
             params: serde_json::json!({
                 "symbol":"BTCUSDT","period":20,"sigma":2.0,"qty":0.1
             }),
-            ..Default::default()   // Add derive(Default) if missing
+            ..Default::default() // Add derive(Default) if missing
         };
 
         loop_forever_core(
-            row, &RMock::default(), &DMock,
-            Box::new(RxMock { candles:c, idx:0 }), &[], false,
-            &RiskMock{fail:false}, &exec_mock(false)
-        ).await;
+            row,
+            &RMock::default(),
+            &DMock,
+            Box::new(RxMock { candles: c, idx: 0 }),
+            &[],
+            false,
+            &RiskMock { fail: false },
+            &exec_mock(false),
+        )
+        .await;
     }
 }
