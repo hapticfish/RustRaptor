@@ -21,6 +21,7 @@
 //! 3. Provide adapters from your exchange client → [`MarketSnapshot`].
 //! 4. Enable the `robust` cargo feature to compile the back‑test harness.
 
+use std::sync::Arc;
 use crate::db::redis::RedisPool;
 use crate::services::market_data::MarketBus;
 use crate::services::strategies::{Candle, OrderBookSnapshot};
@@ -300,7 +301,7 @@ fn map_session(ts: DateTime<Utc>) -> TradingSession {
 pub async fn loop_forever(
     row: crate::services::scheduler::StrategyRow,
     redis: RedisPool,
-    db: PgPool, // HVN cache could be stored later
+    db: Arc<PgPool>, // HVN cache could be stored later
     bus: MarketBus,
     master_key: Vec<u8>,
     is_demo: bool,

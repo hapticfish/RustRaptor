@@ -28,7 +28,7 @@ impl RedisPool {
     pub async fn set_json<K, T>(&self, key: K, value: &T, ttl_secs: usize) -> Result<(), RedisError>
     where
         K: ToRedisArgs + Send + Sync,
-        T: Serialize,
+        T: Serialize + ?Sized,
     {
         let mut con = self.manager().as_ref().clone();
         let payload = serde_json::to_string(value)

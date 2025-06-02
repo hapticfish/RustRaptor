@@ -1,5 +1,6 @@
 //! Medium-Term Trend-Following (fast/slow SMA × Donchian breakout)
 
+use std::sync::Arc;
 use chrono::Timelike;
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -45,7 +46,7 @@ fn dq() -> f64 {
 pub async fn loop_forever(
     row: crate::services::scheduler::StrategyRow,
     redis: RedisPool,
-    db: PgPool,
+    db: Arc<PgPool>,
     bus: MarketBus,
     master_key: Vec<u8>,
     is_demo: bool,
