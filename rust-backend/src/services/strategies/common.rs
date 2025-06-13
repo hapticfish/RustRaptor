@@ -14,6 +14,21 @@ pub struct Candle {
     pub delta: Option<f64>,
 }
 
+// ----------------------------------- basic candle helpers -------------
+impl Default for Candle {
+    fn default() -> Self {
+        Candle {
+            ts: Default::default(),
+            open: 0.0,
+            high: 0.0,
+            low: 0.0,
+            close: 0.0,
+            volume: 0.0,
+            delta: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct OrderBookSnapshot {
     pub bid_depth: f64,

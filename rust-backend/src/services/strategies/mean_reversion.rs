@@ -5,7 +5,7 @@ use crate::{
     db::redis::RedisPool,
     services::{
         market_data::MarketBus,
-        strategies::Candle,
+        strategies::common::Candle,
         trading_engine::{execute_trade, Exchange, TradeRequest},
     },
 };
@@ -249,20 +249,7 @@ mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
 
-    // ----------------------------------- basic candle helpers -------------
-    impl Default for Candle {
-        fn default() -> Self {
-            Candle {
-                ts: Default::default(),
-                open: 0.0,
-                high: 0.0,
-                low: 0.0,
-                close: 0.0,
-                volume: 0.0,
-                delta: None,
-            }
-        }
-    }
+
     fn seq(prices: &[f64]) -> Vec<Candle> {
         prices
             .iter()
