@@ -32,17 +32,25 @@ pub struct TrendParams {
     #[serde(default = "dq")]
     pub qty: f64,
 }
-fn d20() -> u16 { 20 }
-fn d100() -> u16 { 100 }
-fn d55() -> u16 { 55 }
-fn dq()  -> f64 { 0.01 }
+fn d20() -> u16 {
+    20
+}
+fn d100() -> u16 {
+    100
+}
+fn d55() -> u16 {
+    55
+}
+fn dq() -> f64 {
+    0.01
+}
 
 /// ------------------------------------------------------------
 /// Mini-traits so we can inject mocks in tests
 /// ------------------------------------------------------------
 use async_trait::async_trait;
 type TradeExec =
-dyn Fn(TradeRequest, &(dyn Db), i64, bool, &[u8]) -> Result<(), String> + Send + Sync;
+    dyn Fn(TradeRequest, &(dyn Db), i64, bool, &[u8]) -> Result<(), String> + Send + Sync;
 
 #[async_trait]
 pub trait Redis: Send + Sync {
@@ -50,9 +58,15 @@ pub trait Redis: Send + Sync {
 
     async fn get_pos_flag(&self, key: &str) -> Result<Option<bool>, ()>;
 }
-#[async_trait] pub trait Db: Send + Sync {}
-#[async_trait] pub trait MarketBusSub: Send + Sync { async fn recv(&mut self) -> Result<Candle, ()>; }
-pub trait RiskChecker: Send + Sync { fn check_drawdown(&self, user_id: i64) -> Result<(), String>; }
+#[async_trait]
+pub trait Db: Send + Sync {}
+#[async_trait]
+pub trait MarketBusSub: Send + Sync {
+    async fn recv(&mut self) -> Result<Candle, ()>;
+}
+pub trait RiskChecker: Send + Sync {
+    fn check_drawdown(&self, user_id: i64) -> Result<(), String>;
+}
 
 /// ---- impls for real types (prod path unchanged) ------------------------
 #[async_trait]
@@ -65,7 +79,8 @@ impl Redis for RedisPool {
         self.get_json(key).await.map_err(|_| ())
     }
 }
-#[async_trait] impl Db for PgPool {}
+#[async_trait]
+impl Db for PgPool {}
 
 use tokio::sync::broadcast;
 pub struct CandleRx(pub broadcast::Receiver<Candle>);
@@ -77,11 +92,13 @@ impl MarketBusSub for CandleRx {
 }
 
 /// Real risk wrapper
-pub struct RealRisk<'a>{ redis:&'a RedisPool }
-impl RiskChecker for RealRisk<'_>{
-    fn check_drawdown(&self, uid:i64)->Result<(),String>{
+pub struct RealRisk<'a> {
+    redis: &'a RedisPool,
+}
+impl RiskChecker for RealRisk<'_> {
+    fn check_drawdown(&self, uid: i64) -> Result<(), String> {
         futures::executor::block_on(crate::services::risk::check_drawdown(self.redis, uid))
-            .map_err(|e|e.to_string())
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -95,13 +112,13 @@ pub async fn loop_forever(
     bus: MarketBus,
     master_key: Vec<u8>,
     is_demo: bool,
-){
+) {
     let cfg: TrendParams = serde_json::from_value(row.params).expect("bad trend params");
 
     let mut daily: Vec<Candle> = Vec::with_capacity(cfg.slow as usize + 5);
-    let rx  = CandleRx(bus.candles_1h.subscribe());
-    let risk    = RealRisk{ redis:&redis };
-    let db_cl   = db.clone();
+    let rx = CandleRx(bus.candles_1h.subscribe());
+    let risk = RealRisk { redis: &redis };
+    let db_cl = db.clone();
 
     loop_core(
         cfg,
@@ -118,7 +135,8 @@ pub async fn loop_forever(
                 .map_err(|e| e.to_string())
         },
         &mut daily,
-    ).await;
+    )
+    .await;
 }
 
 /// ------------------------------------------------------------
@@ -135,19 +153,21 @@ pub async fn loop_core(
     is_demo: bool,
     risk: &dyn RiskChecker,
     trade_exec: &TradeExec,
-    daily_buf: &mut Vec<Candle>,   // pass mutable buffer so tests can pre-seed
-){
+    daily_buf: &mut Vec<Candle>, // pass mutable buffer so tests can pre-seed
+) {
     let mut agg: Option<Candle> = None;
 
     while let Ok(c) = rx.recv().await {
-        if cfg.symbol.to_uppercase() != "BTCUSDT" { continue; }
+        if cfg.symbol.to_uppercase() != "BTCUSDT" {
+            continue;
+        }
 
         match &mut agg {
-            None    => agg = Some(c),
+            None => agg = Some(c),
             Some(d) => {
                 d.high = d.high.max(c.high);
-                d.low  = d.low .min(c.low);
-                d.close= c.close;
+                d.low = d.low.min(c.low);
+                d.close = c.close;
                 d.volume += c.volume;
             }
         }
@@ -158,8 +178,10 @@ pub async fn loop_core(
                 if daily_buf.len() > cfg.slow as usize + 10 {
                     daily_buf.remove(0);
                 }
-                evaluate_core(daily_buf, &cfg, redis, db, user_id,
-                              master_key, is_demo, risk, trade_exec).await;
+                evaluate_core(
+                    daily_buf, &cfg, redis, db, user_id, master_key, is_demo, risk, trade_exec,
+                )
+                .await;
             }
         }
     }
@@ -180,23 +202,38 @@ pub async fn evaluate_core(
     risk: &dyn RiskChecker,
     trade_exec: &TradeExec,
 ) {
-    if d.len() < cfg.slow as usize { return; }
+    if d.len() < cfg.slow as usize {
+        return;
+    }
 
     let closes: Vec<f64> = d.iter().map(|c| c.close).collect();
-    let highs : Vec<f64> = d.iter().map(|c| c.high ).collect();
-    let lows  : Vec<f64> = d.iter().map(|c| c.low  ).collect();
+    let highs: Vec<f64> = d.iter().map(|c| c.high).collect();
+    let lows: Vec<f64> = d.iter().map(|c| c.low).collect();
 
     let sma = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
 
-    let fast = sma(&closes[closes.len()-cfg.fast as usize..]);
-    let slow = sma(&closes[closes.len()-cfg.slow as usize..]);
+    let fast = sma(&closes[closes.len() - cfg.fast as usize..]);
+    let slow = sma(&closes[closes.len() - cfg.slow as usize..]);
 
-    let don_h = highs.iter().rev().take(cfg.don as usize).fold(f64::MIN, |a, &b| a.max(b));
-    let don_l = lows.iter().rev().take(cfg.don as usize).fold(f64::MAX, |a, &b| a.min(b));
+    let don_h = highs
+        .iter()
+        .rev()
+        .take(cfg.don as usize)
+        .fold(f64::MIN, |a, &b| a.max(b));
+    let don_l = lows
+        .iter()
+        .rev()
+        .take(cfg.don as usize)
+        .fold(f64::MAX, |a, &b| a.min(b));
     let price = *closes.last().unwrap();
 
     let pos_key = format!("trendpos:{user_id}");
-    let in_pos: bool = redis.get_pos_flag(&pos_key).await.ok().flatten().unwrap_or(false);
+    let in_pos: bool = redis
+        .get_pos_flag(&pos_key)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or(false);
 
     match (in_pos, fast > slow, price >= don_h, price <= don_l) {
         // Exit ↓
@@ -239,19 +276,25 @@ pub async fn evaluate_core(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
     use async_trait::async_trait;
+    use std::sync::{Arc, Mutex};
 
-
-    fn make(days: usize, price: f64) -> Vec<Candle>{
-        (0..days).map(|_| Candle{close:price, high:price, low:price, ..Default::default()}).collect()
+    fn make(days: usize, price: f64) -> Vec<Candle> {
+        (0..days)
+            .map(|_| Candle {
+                close: price,
+                high: price,
+                low: price,
+                ..Default::default()
+            })
+            .collect()
     }
 
     // ---------- redis mock -------------
     #[derive(Default)]
     struct RMock {
-        pos:   Arc<Mutex<Option<bool>>>,
-        sets:  Arc<Mutex<u32>>,
+        pos: Arc<Mutex<Option<bool>>>,
+        sets: Arc<Mutex<u32>>,
     }
     #[async_trait]
     impl Redis for RMock {
@@ -268,37 +311,78 @@ mod tests {
 
     // ---------- db mock (unit struct) ---
     struct DMock;
-    #[async_trait] impl Db for DMock {}
+    #[async_trait]
+    impl Db for DMock {}
 
     // ---------- risk mock ---------------
-    struct Risk { fail: bool }
+    struct Risk {
+        fail: bool,
+    }
     impl RiskChecker for Risk {
-        fn check_drawdown(&self, _:i64)->Result<(),String>{
-            if self.fail { Err("dd".into()) } else { Ok(()) }
+        fn check_drawdown(&self, _: i64) -> Result<(), String> {
+            if self.fail {
+                Err("dd".into())
+            } else {
+                Ok(())
+            }
         }
     }
 
     // ---------- trade exec collector ----
-    #[derive(Clone)] struct Call{ side:String, qty:f64 }
-    fn collect(vec: Arc<Mutex<Vec<Call>>>) -> impl Fn(TradeRequest,&(dyn Db),i64,bool,&[u8])->Result<(),String>+Send+Sync{
-        move |req,_,_,_,_| { vec.lock().unwrap().push(Call{side:req.side, qty:req.size}); Ok(()) }
+    #[derive(Clone)]
+    struct Call {
+        side: String,
+        qty: f64,
+    }
+    fn collect(
+        vec: Arc<Mutex<Vec<Call>>>,
+    ) -> impl Fn(TradeRequest, &(dyn Db), i64, bool, &[u8]) -> Result<(), String> + Send + Sync
+    {
+        move |req, _, _, _, _| {
+            vec.lock().unwrap().push(Call {
+                side: req.side,
+                qty: req.size,
+            });
+            Ok(())
+        }
     }
 
     // ---------- tests -------------------
     #[tokio::test]
     async fn entry_signal_triggers_buy_and_sets_flag() {
-        let cfg = TrendParams{ symbol:"BTCUSDT".into(), fast:3, slow:5, don:2, qty:0.1 };
+        let cfg = TrendParams {
+            symbol: "BTCUSDT".into(),
+            fast: 3,
+            slow: 5,
+            don: 2,
+            qty: 0.1,
+        };
 
         // price series makes fast>slow and price == don_h
         let mut hist = make(5, 10.0);
-        hist.push(Candle{close:12.0, high:12.0, low:12.0, ..Default::default()});
+        hist.push(Candle {
+            close: 12.0,
+            high: 12.0,
+            low: 12.0,
+            ..Default::default()
+        });
 
         let redis = RMock::default();
-        let db    = DMock;
+        let db = DMock;
         let calls = Arc::new(Mutex::new(Vec::<Call>::new()));
 
-        evaluate_core(&hist,&cfg,&redis,&db,1,&[],false,
-                      &Risk{fail:false}, &collect(calls.clone())).await;
+        evaluate_core(
+            &hist,
+            &cfg,
+            &redis,
+            &db,
+            1,
+            &[],
+            false,
+            &Risk { fail: false },
+            &collect(calls.clone()),
+        )
+        .await;
 
         assert_eq!(calls.lock().unwrap().len(), 1);
         assert_eq!(*redis.pos.lock().unwrap(), Some(true));
@@ -307,18 +391,42 @@ mod tests {
 
     #[tokio::test]
     async fn exit_signal_triggers_sell_and_unsets_flag() {
-        let cfg = TrendParams{ symbol:"BTCUSDT".into(), fast:3, slow:5, don:2, qty:0.1 };
+        let cfg = TrendParams {
+            symbol: "BTCUSDT".into(),
+            fast: 3,
+            slow: 5,
+            don: 2,
+            qty: 0.1,
+        };
 
         // start above don_h to mimic open position then drop below don_l
         let mut hist = make(5, 10.0);
-        hist.push(Candle{close: 5.0, high:10.0, low: 5.0, ..Default::default()});
+        hist.push(Candle {
+            close: 5.0,
+            high: 10.0,
+            low: 5.0,
+            ..Default::default()
+        });
 
-        let redis = RMock{ pos:Arc::new(Mutex::new(Some(true))), ..Default::default() };
-        let db    = DMock;
+        let redis = RMock {
+            pos: Arc::new(Mutex::new(Some(true))),
+            ..Default::default()
+        };
+        let db = DMock;
         let calls = Arc::new(Mutex::new(Vec::<Call>::new()));
 
-        evaluate_core(&hist,&cfg,&redis,&db,1,&[],false,
-                      &Risk{fail:false}, &collect(calls.clone())).await;
+        evaluate_core(
+            &hist,
+            &cfg,
+            &redis,
+            &db,
+            1,
+            &[],
+            false,
+            &Risk { fail: false },
+            &collect(calls.clone()),
+        )
+        .await;
 
         assert_eq!(calls.lock().unwrap()[0].side, "sell");
         assert_eq!(*redis.pos.lock().unwrap(), Some(false));
@@ -326,30 +434,62 @@ mod tests {
 
     #[tokio::test]
     async fn risk_block_prevents_trade() {
-        let cfg = TrendParams{ symbol:"BTCUSDT".into(), fast:3, slow:5, don:2, qty:0.1 };
-        let hist = make(6, 12.0);  // triggers entry
+        let cfg = TrendParams {
+            symbol: "BTCUSDT".into(),
+            fast: 3,
+            slow: 5,
+            don: 2,
+            qty: 0.1,
+        };
+        let hist = make(6, 12.0); // triggers entry
 
         let redis = RMock::default();
-        let db    = DMock;
+        let db = DMock;
         let calls = Arc::new(Mutex::new(Vec::<Call>::new()));
 
-        evaluate_core(&hist,&cfg,&redis,&db,1,&[],false,
-                      &Risk{fail:true}, &collect(calls.clone())).await;
+        evaluate_core(
+            &hist,
+            &cfg,
+            &redis,
+            &db,
+            1,
+            &[],
+            false,
+            &Risk { fail: true },
+            &collect(calls.clone()),
+        )
+        .await;
 
         assert!(calls.lock().unwrap().is_empty());
     }
 
     #[tokio::test]
     async fn too_few_candles_noop() {
-        let cfg = TrendParams{ symbol:"BTCUSDT".into(), fast:3, slow:5, don:2, qty:0.1 };
+        let cfg = TrendParams {
+            symbol: "BTCUSDT".into(),
+            fast: 3,
+            slow: 5,
+            don: 2,
+            qty: 0.1,
+        };
         let hist = make(3, 10.0);
 
         let redis = RMock::default();
-        let db    = DMock;
+        let db = DMock;
         let calls = Arc::new(Mutex::new(Vec::<Call>::new()));
 
-        evaluate_core(&hist,&cfg,&redis,&db,1,&[],false,
-                      &Risk{fail:false}, &collect(calls.clone())).await;
+        evaluate_core(
+            &hist,
+            &cfg,
+            &redis,
+            &db,
+            1,
+            &[],
+            false,
+            &Risk { fail: false },
+            &collect(calls.clone()),
+        )
+        .await;
 
         assert!(calls.lock().unwrap().is_empty());
     }

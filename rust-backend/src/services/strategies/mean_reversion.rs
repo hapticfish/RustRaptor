@@ -249,7 +249,6 @@ mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
 
-
     fn seq(prices: &[f64]) -> Vec<Candle> {
         prices
             .iter()
@@ -269,7 +268,7 @@ mod tests {
     fn bollinger_values() {
         let (lo, hi) = bollinger(&seq(&[10., 12., 13., 14., 15.]), 5, 2.).unwrap();
         println!("lo = {}, hi = {}", lo, hi); // one-time, to get actual value
-        // then, after running, update the test:
+                                              // then, after running, update the test:
         assert!((lo - 9.35907).abs() < 0.01);
         assert!((hi - 16.2409).abs() < 0.01);
         // Add a comment:

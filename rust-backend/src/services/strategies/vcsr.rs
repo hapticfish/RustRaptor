@@ -25,12 +25,12 @@ use crate::db::redis::RedisPool;
 use crate::services::market_data::MarketBus;
 use crate::services::strategies::{Candle, OrderBookSnapshot};
 use crate::services::trading_engine::{execute_trade, Exchange, TradeRequest};
+use async_trait::async_trait;
 use chrono::{DateTime, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use statrs::statistics::{Data as StatsData, Distribution};
 use std::sync::Arc;
-use async_trait::async_trait;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct VcsrConfig {
@@ -62,24 +62,32 @@ pub struct VcsrConfig {
 // Thin façade traits – give the strategy a seam for mocking
 // -------------------------------------------------------------------------
 type TradeExec =
-dyn Fn(TradeRequest, &(dyn Db), i64, bool, &[u8]) -> Result<(), String> + Send + Sync;
+    dyn Fn(TradeRequest, &(dyn Db), i64, bool, &[u8]) -> Result<(), String> + Send + Sync;
 
 #[async_trait]
 pub trait Redis: Send + Sync {
     async fn set_eq(&self, key: &str, equity: f64) -> Result<(), ()>; // just as example
 }
 
-#[async_trait] pub trait Db: Send + Sync {}
-#[async_trait] pub trait MarketBusSub: Send + Sync { async fn recv(&mut self) -> Result<Candle, ()>; }
-pub trait RiskChecker: Send + Sync  { fn check_drawdown(&self, uid: i64) -> Result<(), String>; }
+#[async_trait]
+pub trait Db: Send + Sync {}
+#[async_trait]
+pub trait MarketBusSub: Send + Sync {
+    async fn recv(&mut self) -> Result<Candle, ()>;
+}
+pub trait RiskChecker: Send + Sync {
+    fn check_drawdown(&self, uid: i64) -> Result<(), String>;
+}
 
 // ---- prod impls ---------------------------------------------------------
-#[async_trait] impl Redis for RedisPool {
-    async fn set_eq(&self, k:&str, v:f64) -> Result<(), ()> {
-        self.set_json(k,&v,600).await.map_err(|_|())
+#[async_trait]
+impl Redis for RedisPool {
+    async fn set_eq(&self, k: &str, v: f64) -> Result<(), ()> {
+        self.set_json(k, &v, 600).await.map_err(|_| ())
     }
 }
-#[async_trait] impl Db for PgPool                       {}
+#[async_trait]
+impl Db for PgPool {}
 
 impl Default for VcsrConfig {
     fn default() -> Self {
@@ -431,54 +439,64 @@ mod robust {
     }
 }
 
-
-
 // =======================================================================
 // UNIT TESTS
 // =======================================================================
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Arc, Mutex};
     use async_trait::async_trait;
+    use std::sync::{Arc, Mutex};
 
     //------------------------------------------------------------------
     // Helpers
     //------------------------------------------------------------------
-    impl Default for Candle {
-        fn default() -> Self {
-            Candle { ts: Default::default(), open:0.0, high:0.0, low:0.0,
-                close:0.0, volume:0.0, delta:None }
-        }
-    }
-    fn seq(prices:&[f64], vol: f64) -> Vec<Candle> {
-        prices.iter().map(|&p| Candle {
-            close:p, open:p, high:p+1.0, low:p-1.0, volume:vol, ..Default::default()
-        }).collect()
+    fn seq(prices: &[f64], vol: f64) -> Vec<Candle> {
+        prices
+            .iter()
+            .map(|&p| Candle {
+                close: p,
+                open: p,
+                high: p + 1.0,
+                low: p - 1.0,
+                volume: vol,
+                ..Default::default()
+            })
+            .collect()
     }
 
     //------------------------------------------------------------------
     // Pure maths
     //------------------------------------------------------------------
-    #[test] fn hvn_top30pc() {
-        let daily = seq(&[10.,11.,12.,13.], 100.);        // equal volume
+    #[test]
+    fn hvn_top30pc() {
+        let daily = seq(&[10., 11., 12., 13.], 100.); // equal volume
         let z = map_hvns(&daily, 0.30);
-        assert_eq!(z.len(), 1);                            // only first element
+        assert_eq!(z.len(), 1); // only first element
     }
 
-    #[test] fn vwap_stats() {
-        let h = seq(&[1.,2.,3.,4.,5.], 1.0);
+    #[test]
+    fn vwap_stats() {
+        let h = seq(&[1., 2., 3., 4., 5.], 1.0);
         let v = intraday_vwap(&h, 5).unwrap();
-        assert!((v.mean-3.0).abs() < 1e-6);
+        assert!((v.mean - 3.0).abs() < 1e-6);
     }
 
-    #[test] fn vol_spike_trips() {
-        let mut h = seq(&[10.;19], 100.);
-        h.push(Candle{close:10., volume:1000., ..Default::default()});
+    #[test]
+    fn vol_spike_trips() {
+        let mut h = seq(&[10.; 19], 100.);
+        h.push(Candle {
+            close: 10.,
+            volume: 1000.,
+            ..Default::default()
+        });
         assert!(volume_spike(&h, &VcsrConfig::default()));
     }
 
-    #[test] fn atr_len_guard() { assert!(average_true_range(&[],14).is_none()); }
+    #[test]
+    fn atr_len_guard() {
+        assert!(average_true_range(&[], 14).is_none());
+    }
 
     //------------------------------------------------------------------
     // Engine mocks
@@ -497,35 +515,64 @@ mod tests {
     }
 
     struct DMock;
-    #[async_trait] impl Db for DMock {}
+    #[async_trait]
+    impl Db for DMock {}
 
-    struct Risk { block: bool }
+    struct Risk {
+        block: bool,
+    }
     impl RiskChecker for Risk {
-        fn check_drawdown(&self, _:i64)->Result<(),String>{
-            if self.block {Err("dd".into())} else {Ok(())}
+        fn check_drawdown(&self, _: i64) -> Result<(), String> {
+            if self.block {
+                Err("dd".into())
+            } else {
+                Ok(())
+            }
         }
     }
 
-    #[derive(Clone)] struct Call { side:String }
-    fn collect(out:Arc<Mutex<Vec<Call>>>)
-               -> impl Fn(TradeRequest,&(dyn Db),i64,bool,&[u8])->Result<(),String> + Send + Sync {
-        move |req,_,_,_,_| { out.lock().unwrap().push(Call{side:req.side}); Ok(()) }
+    #[derive(Clone)]
+    struct Call {
+        side: String,
+    }
+    fn collect(
+        out: Arc<Mutex<Vec<Call>>>,
+    ) -> impl Fn(TradeRequest, &(dyn Db), i64, bool, &[u8]) -> Result<(), String> + Send + Sync
+    {
+        move |req, _, _, _, _| {
+            out.lock().unwrap().push(Call { side: req.side });
+            Ok(())
+        }
     }
 
     //------------------------------------------------------------------
     // generate_signal branches
     //------------------------------------------------------------------
-    fn base_cfg() -> VcsrConfig { VcsrConfig{ vwap_sigma:None, ob_bid_ask_ratio:None, session_filter:None, ..Default::default() } }
+    fn base_cfg() -> VcsrConfig {
+        VcsrConfig {
+            vwap_sigma: None,
+            ob_bid_ask_ratio: None,
+            session_filter: None,
+            ..Default::default()
+        }
+    }
 
     #[tokio::test]
     async fn happy_path_emits_trade() {
         let mut eng = VcsrStrategy::new(base_cfg());
         // craft a demand zone around price 10
-        eng.hvn_cache = vec![DemandZone{price:10.0,width:0.05}];
-        let mut h = seq(&[10.;25], 200.);
-        h.last_mut().unwrap().volume = 1_000.;             // spike
-        h.last_mut().unwrap().delta = Some(100.);
-        h[h.len()-2].delta          = Some(-100.);         // delta flip
+        eng.hvn_cache = vec![DemandZone {
+            price: 10.0,
+            width: 0.05,
+        }];
+
+        let mut h = seq(&[10.; 25], 200.);
+        let last = h.last_mut().unwrap();
+        last.volume = 1_000.;
+        last.delta = Some(100.);
+
+        let pen_idx = h.len() - 2;
+        h[pen_idx].delta = Some(-100.);
 
         assert!(eng.generate_signal(&h, None, 10_000.).is_some());
     }
@@ -533,25 +580,39 @@ mod tests {
     #[tokio::test]
     async fn volume_filter_blocks() {
         let eng = VcsrStrategy::new(base_cfg());
-        assert!(eng.generate_signal(&seq(&[10.;25], 1.), None, 1.).is_none());
+        assert!(eng
+            .generate_signal(&seq(&[10.; 25], 1.), None, 1.)
+            .is_none());
     }
 
     #[tokio::test]
     async fn risk_block_prevents_exec() {
         let trade_log = Arc::new(Mutex::new(Vec::<Call>::new()));
-        let hist = seq(&[10.;25], 1_000.);
+        let hist = seq(&[10.; 25], 1_000.);
         let mut eng = VcsrStrategy::new(base_cfg());
-        eng.hvn_cache = vec![DemandZone{price:10.0,width:0.05}];
+        eng.hvn_cache = vec![DemandZone {
+            price: 10.0,
+            width: 0.05,
+        }];
         hist.last().unwrap(); // silence clippy
 
         // will emit, but Risk blocks it before exec
         if eng.generate_signal(&hist, None, 10_000.).is_some() {
             collect(trade_log.clone())(
-                TradeRequest{ exchange:Exchange::Blowfin, symbol:String::new(),
-                    side:"buy".into(), order_type:String::new(),
-                    price:None, size:0.0 },
-                &DMock, 1,false,&[]
-            ).unwrap();
+                TradeRequest {
+                    exchange: Exchange::Blowfin,
+                    symbol: String::new(),
+                    side: "buy".into(),
+                    order_type: String::new(),
+                    price: None,
+                    size: 0.0,
+                },
+                &DMock,
+                1,
+                false,
+                &[],
+            )
+            .unwrap();
         }
         assert!(trade_log.lock().unwrap().is_empty());
     }
@@ -559,19 +620,20 @@ mod tests {
     #[tokio::test]
     async fn redis_mock_counts_calls() {
         let r = RMock::default();
-        assert_eq!(*r.cnt.lock().unwrap(), 0);           // should start at 0
+        assert_eq!(*r.cnt.lock().unwrap(), 0); // should start at 0
         r.set_eq("equity", 100.0).await.unwrap();
-        assert_eq!(*r.cnt.lock().unwrap(), 1);           // incremented
+        assert_eq!(*r.cnt.lock().unwrap(), 1); // incremented
         r.set_eq("equity", 200.0).await.unwrap();
-        assert_eq!(*r.cnt.lock().unwrap(), 2);           // incremented again
+        assert_eq!(*r.cnt.lock().unwrap(), 2); // incremented again
     }
 
     //------------------------------------------------------------------
     // Robust harness smoke-test (only when feature enabled)
     //------------------------------------------------------------------
-    #[cfg(feature="robust")]
-    #[test] fn robust_runs() {
-        let hist = seq(&[10.; 4_400], 200.);               // 2y-ish of 4-h bars
+    #[cfg(feature = "robust")]
+    #[test]
+    fn robust_runs() {
+        let hist = seq(&[10.; 4_400], 200.); // 2y-ish of 4-h bars
         robust::run(&hist, &VcsrConfig::default());
     }
 }
