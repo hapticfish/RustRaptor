@@ -262,3 +262,113 @@ async fn blowfin_depth_feed(
         let _ = bus.order_book.send(snap);
     }
 }
+
+// ──────────────────────────────────────────────────────────────
+// UNIT-TESTS  ▸  frame_ok()  &  BinanceKline helpers
+// ──────────────────────────────────────────────────────────────
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    use std::env;
+
+    // ------------ small helper to build an HMAC-SHA256 hex digest ----------
+    fn hmac_hex(secret: &str, body: &[u8]) -> String {
+        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        hex::encode(mac.finalize().into_bytes())
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 1. FeedSecurity::None  → always true
+    // ──────────────────────────────────────────────────────────
+    #[test]
+    fn frame_ok_none_always_accepts() {
+        assert!(frame_ok(&FeedSecurity::None, "", b"ignored"));
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 2. HMAC in JSON field   ✓ valid signature is accepted
+    // ──────────────────────────────────────────────────────────
+    #[test]
+    fn hmac_json_valid_signature() {
+        const SECRET_ENV: &str = "TEST_HMAC_SECRET";
+        let secret = "super-secret";
+        env::set_var(SECRET_ENV, secret);
+
+        let body = br#"{"price":123}"#;
+        let sig = hmac_hex(secret, body);
+        let json = format!(r#"{{"sig":"{}","price":123}}"#, sig);
+
+        let sec = FeedSecurity::Hmac {
+            header: "sig",
+            secret_env: SECRET_ENV,
+        };
+        assert!(frame_ok(&sec, &json, body));
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 3. HMAC in JSON field   ✗ wrong signature is rejected
+    // ──────────────────────────────────────────────────────────
+    #[test]
+    fn hmac_json_wrong_signature() {
+        const SECRET_ENV: &str = "TEST_HMAC_SECRET2";
+        env::set_var(SECRET_ENV, "key");
+        let bad_json = r#"{"sig":"DEADBEEF","foo":42}"#;
+
+        let sec = FeedSecurity::Hmac {
+            header: "sig",
+            secret_env: SECRET_ENV,
+        };
+        assert!(!frame_ok(&sec, bad_json, br#"{"foo":42}"#));
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 4. HMAC supplied in HTTP-style headers
+    // ──────────────────────────────────────────────────────────
+    #[test]
+    fn hmac_header_valid_signature() {
+        const SECRET_ENV: &str = "TEST_HMAC_SECRET3";
+        let secret = "another-secret";
+        env::set_var(SECRET_ENV, secret);
+
+        let body = b"payload-123";
+        let sig = hmac_hex(secret, body);
+        let headers = format!("x-signature: {}\r\nother: abc\r\n", sig);
+
+        let sec = FeedSecurity::Hmac {
+            header: "x-signature",
+            secret_env: SECRET_ENV,
+        };
+        assert!(frame_ok(&sec, &headers, body));
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 5. BinanceKline string-to-f64 helpers
+    // ──────────────────────────────────────────────────────────
+    #[test]
+    fn binance_kline_parsing_helpers() {
+        let kl = BinanceKline {
+            close_time: 0,
+            interval: "1h".into(),
+            open: "1.23".into(),
+            high: "2.34".into(),
+            low: "0.56".into(),
+            close: "1.11".into(),
+            volume: "99.9".into(),
+        };
+        assert!((kl.open() - 1.23).abs() < 1e-9);
+        assert!((kl.high() - 2.34).abs() < 1e-9);
+        assert!((kl.low() - 0.56).abs() < 1e-9);
+        assert!((kl.close() - 1.11).abs() < 1e-9);
+        assert!((kl.volume() - 99.9).abs() < 1e-9);
+
+        // malformed string returns 0.0 instead of panicking
+        let bad = BinanceKline {
+            open: "bad".into(),
+            ..kl
+        };
+        assert_eq!(bad.open(), 0.0);
+    }
+}

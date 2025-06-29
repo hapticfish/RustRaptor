@@ -43,7 +43,6 @@ pub fn sign_ws(secret: &str, timestamp: &str, nonce: &str) -> String {
     general_purpose::STANDARD.encode(mac.finalize().into_bytes())
 }
 
-
 // ======================================================================
 // UNIT TESTS
 // ======================================================================
@@ -55,10 +54,10 @@ mod tests {
 
     // ---------- deterministic vectors (from Python calc) ----------
     const SECRET: &str = "mysecret";
-    const TS: &str     = "1690000000000";
-    const NONCE: &str  = "nonce123";
-    const PATH: &str   = "/api/v1/order";
-    const BODY: &str   = r#"{"foo":1}"#;
+    const TS: &str = "1690000000000";
+    const NONCE: &str = "nonce123";
+    const PATH: &str = "/api/v1/order";
+    const BODY: &str = r#"{"foo":1}"#;
     const METHOD: &str = "POST";
 
     // pre-computed with:

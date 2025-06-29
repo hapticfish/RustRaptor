@@ -120,7 +120,6 @@ fn depth_from_event(ev: &WsEvent) -> Option<DepthFrame> {
     })
 }
 
-
 // ──────────────────────────────────────────────────────────────
 // UNIT-TESTS
 // ──────────────────────────────────────────────────────────────
@@ -133,7 +132,7 @@ mod tests {
     fn make_event(bids: &[(&str, &str)], asks: &[(&str, &str)]) -> WsEvent {
         let arrify = |side: &[(&str, &str)]| {
             side.iter()
-                .map(|(p, s)| json!([p, s, "0"]))   // 3-tuple as returned by API
+                .map(|(p, s)| json!([p, s, "0"])) // 3-tuple as returned by API
                 .collect::<Vec<_>>()
         };
         let raw = json!({
@@ -151,8 +150,7 @@ mod tests {
     // ──────────────────────────────────────────────────────────
     #[test]
     fn depth_parses_and_sums() {
-        let ev = make_event(&[("30000", "2"), ("29990", "1.5")],
-                            &[("30010", "4")]);
+        let ev = make_event(&[("30000", "2"), ("29990", "1.5")], &[("30010", "4")]);
 
         let df = depth_from_event(&ev).expect("DepthFrame");
         assert!((df.bid_sum - 3.5).abs() < 1e-9);
@@ -177,12 +175,11 @@ mod tests {
     // ──────────────────────────────────────────────────────────
     #[test]
     fn malformed_levels_are_ignored() {
-        let ev = make_event(&[("BAD", "X"), ("30000", "1")],
-                            &[("29999", "ABC")]);
+        let ev = make_event(&[("BAD", "X"), ("30000", "1")], &[("29999", "ABC")]);
 
         let df = depth_from_event(&ev).unwrap();
-        assert!((df.bid_sum - 1.0).abs() < 1e-9);   // only the good one counted
-        assert_eq!(df.ask_sum, 0.0);                // bad ask ignored ⇒ zero
+        assert!((df.bid_sum - 1.0).abs() < 1e-9); // only the good one counted
+        assert_eq!(df.ask_sum, 0.0); // bad ask ignored ⇒ zero
     }
 
     // ──────────────────────────────────────────────────────────

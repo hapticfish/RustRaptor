@@ -117,7 +117,6 @@ async fn active_users(pg: &PgPool) -> sqlx::Result<Vec<i64>> {
 // UNIT TESTS
 // ======================================================================
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,7 +195,7 @@ mod tests {
         let dd = -MAX_DD_PCT + 0.0001;
         let rows = vec![make_row(now, dd)];
         let sum = compute_dd(&rows, now - LOOKBACK_SECS);
-        assert!( (-sum) < MAX_DD_PCT );
+        assert!((-sum) < MAX_DD_PCT);
     }
 
     #[test]
@@ -205,7 +204,7 @@ mod tests {
         let rows = vec![
             "bad|row".to_string(),
             make_row(now, -1.0),
-            "123456".to_string(),               // missing pnl
+            "123456".to_string(), // missing pnl
         ];
         let sum = compute_dd(&rows, now - LOOKBACK_SECS);
         assert_eq!(sum, -1.0);
