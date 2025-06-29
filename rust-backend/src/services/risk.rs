@@ -112,3 +112,102 @@ async fn active_users(pg: &PgPool) -> sqlx::Result<Vec<i64>> {
 
     Ok(rows.into_iter().map(|r| r.user_id).collect())
 }
+
+// ======================================================================
+// UNIT TESTS
+// ======================================================================
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn compute_dd(rows: &[String], cutoff_ts: i64) -> f64 {
+        rows.iter()
+            .filter_map(|s| {
+                let mut it = s.split('|');
+                let ts = it.next()?.parse::<i64>().ok()?;
+                let pnl = it.next()?.parse::<f64>().ok()?;
+                (ts >= cutoff_ts).then_some(pnl)
+            })
+            .sum()
+    }
+
+    // ───────────────────────────────────────── Slippage guard
+    #[test]
+    fn slippage_within_limit_passes() {
+        assert!(check_slippage(9.99).is_ok());
+    }
+
+    #[test]
+    fn slippage_at_limit_passes() {
+        assert!(check_slippage(MAX_SLIPPAGE_BPS).is_ok());
+    }
+
+    #[test]
+    fn slippage_over_limit_fails() {
+        let e = check_slippage(MAX_SLIPPAGE_BPS + 0.01).unwrap_err();
+        match e {
+            TradeError::RiskViolation(msg) => assert!(msg.contains("slippage")),
+            _ => panic!("wrong error variant"),
+        }
+    }
+
+    // ───────────────────────────────────────── Draw-down maths helper
+    fn make_row(ts: i64, pnl: f64) -> String {
+        format!("{}|{:.4}", ts, pnl)
+    }
+
+    #[test]
+    fn dd_empty_is_zero() {
+        let rows: Vec<String> = vec![];
+        let sum = compute_dd(&rows, 0);
+        assert_eq!(sum, 0.0);
+    }
+
+    #[test]
+    fn dd_ignores_older_than_cutoff() {
+        let now = Utc::now().timestamp();
+        let old = now - LOOKBACK_SECS - 10;
+        let rows = vec![make_row(old, -5.0), make_row(now, -3.0)];
+        let dd = compute_dd(&rows, now - LOOKBACK_SECS);
+        assert!((dd + 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn dd_breach_detected() {
+        let now = Utc::now().timestamp();
+        let dd = -MAX_DD_PCT - 1.0;
+        let rows = vec![make_row(now, dd)];
+        let sum = compute_dd(&rows, now - LOOKBACK_SECS);
+        assert_eq!(sum, dd);
+        // emulate real check
+        let e = if sum < 0.0 && (-sum) > MAX_DD_PCT {
+            Some(TradeError::RiskViolation("breach".into()))
+        } else {
+            None
+        };
+        assert!(e.is_some(), "breach should be flagged");
+    }
+
+    #[test]
+    fn dd_borderline_allows_trade() {
+        let now = Utc::now().timestamp();
+        let dd = -MAX_DD_PCT + 0.0001;
+        let rows = vec![make_row(now, dd)];
+        let sum = compute_dd(&rows, now - LOOKBACK_SECS);
+        assert!( (-sum) < MAX_DD_PCT );
+    }
+
+    #[test]
+    fn dd_skips_malformed_rows() {
+        let now = Utc::now().timestamp();
+        let rows = vec![
+            "bad|row".to_string(),
+            make_row(now, -1.0),
+            "123456".to_string(),               // missing pnl
+        ];
+        let sum = compute_dd(&rows, now - LOOKBACK_SECS);
+        assert_eq!(sum, -1.0);
+    }
+}
