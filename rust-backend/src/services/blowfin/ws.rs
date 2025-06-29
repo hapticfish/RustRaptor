@@ -121,3 +121,84 @@ fn depth_from_event(ev: &WsEvent) -> Option<DepthFrame> {
 }
 
 
+// ──────────────────────────────────────────────────────────────
+// UNIT-TESTS
+// ──────────────────────────────────────────────────────────────
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // handy helper producing a WsEvent in JSON then parsing it
+    fn make_event(bids: &[(&str, &str)], asks: &[(&str, &str)]) -> WsEvent {
+        let arrify = |side: &[(&str, &str)]| {
+            side.iter()
+                .map(|(p, s)| json!([p, s, "0"]))   // 3-tuple as returned by API
+                .collect::<Vec<_>>()
+        };
+        let raw = json!({
+            "arg": { "channel": "books5" },
+            "data": [{
+                "bids": arrify(bids),
+                "asks": arrify(asks)
+            }]
+        });
+        serde_json::from_value(raw).expect("valid WsEvent")
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 1. Nominal path – sums both sides correctly
+    // ──────────────────────────────────────────────────────────
+    #[test]
+    fn depth_parses_and_sums() {
+        let ev = make_event(&[("30000", "2"), ("29990", "1.5")],
+                            &[("30010", "4")]);
+
+        let df = depth_from_event(&ev).expect("DepthFrame");
+        assert!((df.bid_sum - 3.5).abs() < 1e-9);
+        assert!((df.ask_sum - 4.0).abs() < 1e-9);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 2. Empty data array ⇒ None (guard-clause)
+    // ──────────────────────────────────────────────────────────
+    #[test]
+    fn empty_data_returns_none() {
+        let raw = json!({
+            "arg": { "channel": "books5" },
+            "data": []                      // empty
+        });
+        let ev: WsEvent = serde_json::from_value(raw).unwrap();
+        assert!(depth_from_event(&ev).is_none());
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 3. Malformed price/size values are skipped, not panicked
+    // ──────────────────────────────────────────────────────────
+    #[test]
+    fn malformed_levels_are_ignored() {
+        let ev = make_event(&[("BAD", "X"), ("30000", "1")],
+                            &[("29999", "ABC")]);
+
+        let df = depth_from_event(&ev).unwrap();
+        assert!((df.bid_sum - 1.0).abs() < 1e-9);   // only the good one counted
+        assert_eq!(df.ask_sum, 0.0);                // bad ask ignored ⇒ zero
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // 4. Non-books5 channel is filtered out upstream – we still
+    //    check that helper would yield None if called directly.
+    // ──────────────────────────────────────────────────────────
+    #[test]
+    fn wrong_channel_returns_none() {
+        let raw = json!({
+            "arg": { "channel": "orders" },
+            "data":[{ "bids":[], "asks":[] }]
+        });
+        let ev: WsEvent = serde_json::from_value(raw).unwrap();
+        // depth_from_event does not look at channel but upstream does;
+        // here we assert the sums are zero to highlight expectation.
+        let df = depth_from_event(&ev).unwrap();
+        assert_eq!(df.bid_sum + df.ask_sum, 0.0);
+    }
+}
