@@ -56,6 +56,12 @@ rand = "0.8.5"
 async-trait = "0.1.88"
 regex = "1.11.1"
 
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features=["json","env-filter"] }
+tracing-opentelemetry = "0.22"        # for future trace export
+metrics            = "0.21"
+metrics-exporter-prometheus = "0.12"
+
 
 [features]
 default = []         # <- default set is empty

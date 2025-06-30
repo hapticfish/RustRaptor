@@ -1,4 +1,6 @@
+use tracing_subscriber::{fmt, EnvFilter};
 use actix_web::{middleware::Logger, web, App, HttpServer};
+use metrics_exporter_prometheus::PrometheusBuilder;
 use rustraptor_backend::services::risk;
 use sqlx::postgres::PgPoolOptions;
 
@@ -12,14 +14,22 @@ use rustraptor_backend::{
     services::scheduler,
     utils::route_debug::{dump_routes, param_test, request_info},
 };
+use rustraptor_backend::middleware::metrics::Metrics;
 
-fn init_logging() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-}
+// fn init_logging() {
+//     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+// }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    init_logging();
+    fmt::Subscriber::builder().with_env_filter(EnvFilter::from_default_env()).json().init();
+
+    PrometheusBuilder::new()
+        .with_http_listener(([0, 0, 0, 0], 9000))
+        .install()
+        .expect("metrics exporter");
+
+    // init_logging();
     println!("Starting RustRaptor backend…");
 
     let settings = Settings::new().unwrap_or_else(|e| {
@@ -62,6 +72,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
+            .wrap(Metrics)
             .wrap(Logger::default())
             .wrap(rustraptor_backend::middleware::Auth)
             .app_data(web::Data::new(settings_clone.clone()))

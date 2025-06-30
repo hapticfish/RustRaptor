@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  # ───────────────── Loki (log database)
+  loki:
+    image: grafana/loki:2.9.0
+    command: -config.file=/etc/loki/loki.yml          # custom file
+    volumes:
+      - ./loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki                              # persisted chunks
+    ports:
+      - "3100:3100"
+
+  # ───────────────── Promtail (log shipper)
+  promtail:
+    image: grafana/promtail:2.9.0
+    command: -config.file=/etc/promtail/promtail.yml
+    volumes:
+      - ./promtail.yml:/etc/promtail/promtail.yml:ro
+      - ../logs:/var/log/rustraptor                   #  ← log dir created by Docker log-driver
+    depends_on: [loki]
+
+  # ───────────────── Prometheus (metrics DB)
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    command: --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on: [loki]
+
+  # ───────────────── Grafana (dashboards)
+  grafana:
+    image: grafana/grafana:10.2.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./provisioning:/etc/grafana/provisioning      # datasources + dashboards
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      # set an admin pw in real envs:  GF_SECURITY_ADMIN_PASSWORD=supersecret
+    depends_on: [prometheus, loki]
+
+volumes:
+  loki_data:
