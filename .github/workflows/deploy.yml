@@ -1,0 +1,38 @@
+# .github/workflows/deploy.yml
+name: deploy
+
+on:
+  push:
+    tags:
+      - 'v*'        # every version tag triggers a deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Build & push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.ECR_REGISTRY }}/rustraptor-backend:${{ github.ref_name }}
+
+      - name: Deploy to ECS
+        if: ${{ env.DEPLOY_ENABLED == 'true' }}
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          # assumes you uploaded a task definition JSON in previous step
+          service: rustraptor
+          cluster: prod
+          task-definition: task-def.json

@@ -1,4 +1,42 @@
-name: release.yml
+name: release            # appears in the Actions tab
+
+# Fire *after* every run of the workflow named “Rust CI”
 on:
+  workflow_run:
+    workflows: ["Rust CI"]
+    branches: [master]         # only when CI ran on master
+    types:
+      - completed              # event is dispatched when CI finishes
 
 jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    # Gate on CI success
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      # ── full git history (cargo-release needs tags) ───────────
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      # ── install cargo-release binary ───────────────────────────
+      - uses: taiki-e/install-action@cargo-release
+
+      # ── semver bump & tag (but no crates.io publish) ──────────
+      - name: Run cargo-release (auto semver)
+        id: bump
+        env:
+          CARGO_RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cargo release \
+            --no-publish \
+            --execute \
+            --skip-push \
+            $(git log -1 --pretty=%B | grep -q "BREAKING CHANGE" && echo major || \
+              git log -1 --pretty=%B | grep -q "^feat:" && echo minor || echo patch)
+
+      # ── push the version-bump commit & tag back to GitHub ─────
+      - name: Push tag & changelog
+        run: |
+          git push origin master --follow-tags
