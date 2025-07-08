@@ -1,12 +1,10 @@
+# .github/workflows/ci.yml
 name: Rust CI
 
 on:
-  push:
-    branches: [master]            # run on direct pushes
-  pull_request:
-    branches: [master]            # and on PRs targeting master
+  push:          { branches: [master] }
+  pull_request:  { branches: [master] }
 
-# cancel previous CI run on the same branch / PR
 concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: true
@@ -15,18 +13,36 @@ jobs:
   build-test-lint:
     runs-on: ubuntu-latest
 
-    steps:
-      # ── checkout repo ──────────────────────────────────────────
-      - uses: actions/checkout@v4
+    services:
+      pg:
+        image: postgres:15
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: rustraptor_ci
+        ports: [ '5432:5432' ]
+        options: >-
+          --health-cmd="pg_isready -U ci"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
-      # ── Rust toolchain + components ────────────────────────────
-      - uses: actions-rs/toolchain@v1
+    # ── Secrets become env-vars visible to *all* steps
+    env:
+      DATABASE_URL: ${{ secrets.PG_URL }}
+      REDIS_URL:    ${{ secrets.REDIS_URL }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Rust toolchain + clippy + fmt
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           components: clippy, rustfmt
           override: true
 
-      # ── cache Cargo registry / git / target ────────────────────
       - uses: actions/cache@v3
         with:
           path: |
@@ -36,14 +52,17 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      # ── formatting check ───────────────────────────────────────
       - name: rustfmt
         run: cargo fmt --check
 
-      # ── static lints (deny warnings) ───────────────────────────
       - name: clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      # ── full test suite ────────────────────────────────────────
-      - name: tests
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli --no-default-features --features postgres
+
+      - name: Run migrations
+        run: sqlx migrate run --database-url "$DATABASE_URL"
+
+      - name: Test suite
         run: cargo test --all-features --verbose
