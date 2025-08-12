@@ -12,6 +12,7 @@ pub mod services {
     pub mod scheduler;
     pub mod trading_engine;
 
+    pub mod crypto;
     pub mod risk;
 
     pub mod blowfin;

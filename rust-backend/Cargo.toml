@@ -7,6 +7,9 @@ edition = "2021"
 name = "rustraptor_backend"  # This is how the lib is named internally (with underscores)
 path = "src/lib.rs"
 
+[workspace]
+members = ["rust-backend", "tools"]
+
 [dependencies]
 actix-web = "4"
 actix-rt = "2"
@@ -42,6 +45,11 @@ env_logger = "0.10"
 jsonwebtoken = "8.3"
 hex          = "0.4"      # for hex ⇄ bytes in verify_hmac
 subtle       = "2"        # constant-time equality
+
+aes-gcm = "0.10"        # RustCrypto AEAD
+rand_core = "0.6"
+sodiumoxide = { version = "0.2", default-features = false }
+zeroize = { version = "1.6", features = ["zeroize_derive"] }
 
 chrono = { version = "0.4", features = ["serde"] }
 tokio-tungstenite = "0.26.2"

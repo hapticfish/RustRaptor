@@ -6,12 +6,21 @@
 //! calls are now routed through *traits* so the unit-tests can inject mocks
 //! without `unsafe` or global state hacks.
 
-use crate::services::blowfin::api::OrderRequest;
-use crate::services::{blowfin, risk};
-pub(crate) use crate::utils::errors::TradeError;
-
+use redis::Client;
 use serde_json::Value;
 use sqlx::PgPool;
+use crate::{
+    db::api_keys::ApiKey,
+    services::{
+        blowfin::{
+            api::OrderRequest,
+            client::BlowfinClient,
+        },
+        crypto::GLOBAL_CRYPTO,
+        risk,
+    },
+    utils::errors::TradeError,
+};
 
 // ──────────────────────────────────────────────────────────────
 // Public types
@@ -78,27 +87,6 @@ pub trait ApiClient: Send + Sync {
     ) -> Result<ApiResponse, TradeError>;
 }
 
-pub struct BlowfinClient;
-#[async_trait::async_trait]
-impl ApiClient for BlowfinClient {
-    async fn place_order(
-        &self,
-        db: &PgPool,
-        user_id: i64,
-        order: &OrderRequest,
-        is_demo: bool,
-        master_key: &[u8],
-    ) -> Result<ApiResponse, TradeError> {
-        let raw = blowfin::api::place_order(db, user_id, order, is_demo, master_key)
-            .await
-            .map_err(TradeError::Api)?;
-        Ok(ApiResponse {
-            code: raw.code,
-            data: raw.data,
-        })
-    }
-}
-
 // ──────────────────────────────────────────────────────────────
 //  Generic core  (unit-testable)
 // ──────────────────────────────────────────────────────────────
@@ -152,16 +140,19 @@ pub async fn execute_trade(
     is_demo: bool,
     master_key: &[u8],
 ) -> Result<TradeResponse, TradeError> {
+    // 1) fetch & decrypt creds
+    let row = ApiKey::get_by_user_and_exchange(db, user_id, "blowfin")
+        .await
+        .map_err(|e| TradeError::Db(e.into()))?        // ← NEW: convert sqlx::Error ➜ TradeError
+        .ok_or(TradeError::MissingKey)?;
+    let creds = row.decrypt(&GLOBAL_CRYPTO)
+        .map_err(|e| TradeError::Api(e.into()))?;                         // map into TradeError
+
+    let adapter = BlowfinClient::new(creds);
+
     execute_trade_with(
-        req,
-        db,
-        user_id,
-        is_demo,
-        master_key,
-        &ProdRisk,
-        &BlowfinClient,
-    )
-    .await
+        req, db, user_id, is_demo, master_key, &ProdRisk, &adapter,
+    ).await
 }
 
 // ======================================================================

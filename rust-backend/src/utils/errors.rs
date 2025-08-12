@@ -69,31 +69,31 @@ pub enum TradeError {
     InvalidRequest(String),
     Other(String),
     RiskViolation(String),
+    MissingKey,
+    Db(sqlx::Error),
 }
 
 impl fmt::Display for TradeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            TradeError::Api(e) => write!(f, "API error: {}", e),
-            TradeError::InvalidRequest(msg) => write!(f, "Invalid request: {}", msg),
-            TradeError::RiskViolation(msg) => write!(f, "Risk violation: {}", msg),
-            TradeError::Other(msg) => write!(f, "{}", msg),
+            TradeError::Api(e)           => write!(f, "{e}"),
+            TradeError::InvalidRequest(m)
+            => write!(f, "Invalid request: {m}"),
+            TradeError::RiskViolation(m) => write!(f, "Risk violation: {m}"),
+            TradeError::MissingKey       => write!(f, "API key not registered"),
+            TradeError::Other(m)         => write!(f, "{m}"),
+            TradeError::Db(_) => write!(f, "Database error:"),
         }
     }
 }
 
-impl Error for TradeError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            TradeError::Api(e) => Some(e),
-            _ => None,
-        }
-    }
-}
-
-// Allow using `?` to convert ApiError into TradeError::Api
+/// Allow `?` to lift any `ApiError` into the domain layer
 impl From<ApiError> for TradeError {
-    fn from(err: ApiError) -> Self {
-        TradeError::Api(err)
-    }
+    fn from(e: ApiError) -> Self { TradeError::Api(e) }
+}
+
+/// Convenience: lift `sqlx::Error` directly into `TradeError`—
+/// lets you keep the plain `?` on async DB calls.
+impl From<sqlx::Error> for TradeError {
+    fn from(e: sqlx::Error) -> Self { TradeError::Api(e.into()) }
 }

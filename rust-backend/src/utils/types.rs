@@ -8,6 +8,12 @@ pub struct ApiResponse<T> {
     pub data: Option<T>,
 }
 
+#[derive(Debug, serde::Serialize, Deserialize)]
+pub struct OrderResp {
+    pub order_id: String,
+    pub status:   String,
+}
+
 /* ------------------------- Postgres ENUMs ------------------------ */
 
 #[derive(Debug, Serialize, Deserialize, Type)]

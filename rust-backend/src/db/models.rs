@@ -25,6 +25,10 @@ pub struct ApiKey {
     pub encrypted_api_key: Vec<u8>,
     pub encrypted_secret: Vec<u8>,
     pub encrypted_passphrase: Option<Vec<u8>>,
+    pub encrypted_data_key: Vec<u8>,
+    pub nonce_key: Vec<u8>,
+    pub nonce_secret: Vec<u8>,
+    pub nonce_passphrase: Option<Vec<u8>>,
     pub created_at: Option<DateTime<Utc>>,
 }
 

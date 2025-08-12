@@ -15,8 +15,8 @@
 #    env_file:
 #      - ./rust-backend/.env
 #
-#  discord-bot:
-#    build: ./discord-bot
+#  frontend:
+#    build: ./frontend
 #    depends_on:
 #      - rust-backend
 #

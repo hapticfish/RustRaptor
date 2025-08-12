@@ -3,3 +3,5 @@ pub mod strategies;
 pub(crate) mod copy_trading;
 pub  mod trading_engine;
 mod scheduler;
+
+pub mod crypto;

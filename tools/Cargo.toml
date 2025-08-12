@@ -1,0 +1,8 @@
+# tools/Cargo.toml
+[package]
+name = "keygen"
+edition = "2021"
+
+[dependencies]
+sodiumoxide = "0.2"
+base64      = "0.21"
